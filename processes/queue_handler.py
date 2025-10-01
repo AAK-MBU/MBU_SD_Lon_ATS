@@ -1,12 +1,17 @@
 """Module to hande queue population"""
 
+import sys
 import asyncio
 import json
 import logging
 
+from datetime import datetime
+
 from automation_server_client import Workqueue
 
 from helpers import config
+from helpers import helper_functions
+from helpers.process_constants import PROCESS_CONSTANTS
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +20,57 @@ def retrieve_items_for_queue() -> list[dict]:
     """Function to populate queue"""
     data = []
     references = []
+
+    if "--kv1" not in sys.argv:
+        print("NOT KV1, STOP")
+        logger.info("NOT KV1, STOP")
+        sys.exit()
+
+    proc_args = ""
+
+    proc_args = PROCESS_CONSTANTS["kv_proc_args"]
+
+    process = proc_args.get("process", None).upper()
+
+    if not process or process == "":
+        raise ValueError("No process defined in sys arguments!")
+
+    # Set variables for function call
+    process_procedure = config.PROCESS_PROCEDURE_DICT.get(
+        process,
+        None
+    )
+    if not process_procedure:
+        raise ValueError(f"Process procedure for {process} not defined in dictionary")
+
+    control_procedure = process_procedure.get(
+        "procedure",
+        ValueError(f"No stored procedure for {process_procedure} in dictionary")
+    )
+    procedure_params = process_procedure.get(
+        "parameters",
+        ValueError(f"No parameters for {process_procedure} in dictionary")
+    )
+
+    logger.info(f"Running {process = }, procedure {control_procedure.__name__}, {procedure_params = }")
+
+    # Get items for process
+    retrieved_items = control_procedure(**procedure_params)
+
+    print(f"len of retrieved_items: {len(retrieved_items)}")
+    sys.exit()
+
+    if retrieved_items:
+        for i, item in retrieved_items:
+            references.append(f"{process}_{datetime.now().strftime('%d%m%y')}_{i+1}")
+
+            formatted_item = json.dumps(helper_functions.format_item(item), ensure_ascii=False)
+            data.append(formatted_item)
+
+        logger.info(f"Populated queue with {len(retrieved_items)} items.")
+
+    else:
+        logger.info("No items found. Queue not populated")
 
     items = [
         {"reference": ref, "data": d} for ref, d in zip(references, data, strict=True)

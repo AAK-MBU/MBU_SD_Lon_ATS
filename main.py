@@ -20,12 +20,32 @@ from processes.queue_handler import concurrent_add, retrieve_items_for_queue
 logger = logging.getLogger(__name__)
 
 
+# ╔══════════════════════════════════════════════╗
+# ║ 🔥 REMOVE BEFORE DEPLOYMENT (TEMP OVERRIDES) 🔥 ║
+# ╚══════════════════════════════════════════════╝
+# This block disables SSL verification and overrides env vars
+import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+_old_request = requests.Session.request
+def unsafe_request(self, *args, **kwargs):
+    kwargs['verify'] = False
+    return _old_request(self, *args, **kwargs)
+requests.Session.request = unsafe_request
+# ╔══════════════════════════════════════════════╗
+# ║ 🔥 REMOVE BEFORE DEPLOYMENT (TEMP OVERRIDES) 🔥 ║
+# ╚══════════════════════════════════════════════╝
+
+
 async def populate_queue(workqueue: Workqueue):
     """Populate the workqueue with items to be processed."""
 
     logger.info("Populating workqueue...")
 
     items_to_queue = retrieve_items_for_queue()
+
+    print(f"reached after items to queue, len: {len(items_to_queue)}")
+    sys.exit()
 
     queue_references = {str(r) for r in ats_functions.get_workqueue_items(workqueue)}
 
@@ -140,13 +160,20 @@ if __name__ == "__main__":
     prod_workqueue = ats.workqueue()
     process = ats.process
 
+    if "--kv1" not in sys.argv:
+        print("NOT KV1, STOP")
+        logger.info("NOT KV1, STOP")
+        sys.exit()
+
     if "--queue" in sys.argv:
         asyncio.run(populate_queue(prod_workqueue))
 
-    if "--process" in sys.argv:
-        asyncio.run(process_workqueue(prod_workqueue))
+        sys.exit()  # REMOVE
 
-    if "--finalize" in sys.argv:
-        asyncio.run(finalize(prod_workqueue))
+    # if "--process" in sys.argv:
+    #     asyncio.run(process_workqueue(prod_workqueue))
+
+    # if "--finalize" in sys.argv:
+    #     asyncio.run(finalize(prod_workqueue))
 
     sys.exit(0)
