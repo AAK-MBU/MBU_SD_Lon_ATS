@@ -32,20 +32,27 @@ def kv1(overenskomst: int):
     #         and ans.Statuskode in ('1', '3', '5')
     #         and ans.Institutionskode!='XC'
     # """
-    # sql = f"""
-    #     SELECT top(10)
-    #         ans.Tjenestenummer, ans.Overenskomst, ans.Afdeling, ans.Institutionskode, perstam.Navn, ans.Startdato, ans.Slutdato, ans.Statuskode, org.LOSID
-    #     FROM [Personale].[sd_magistrat].[Ansættelse_mbu] ans
-    #         right join [Personale].[sd].[personStam] perstam
-    #             on ans.CPR = perstam.CPR
-    #         left join [Personale].[sd].[Organisation] org
-    #             on ans.Afdeling = org.SDafdID
-    #     WHERE
-    #         Slutdato > getdate() and Startdato <= getdate()
-    #         and ans.Overenskomst={overenskomst}
-    #         and ans.Statuskode in ('1', '3', '5')
-    #         -- and ans.Institutionskode!='XC'
-    # """
+    sql = """
+        SELECT top(10)
+            ans.Tjenestenummer,
+            ans.Overenskomst,
+            ans.Afdeling,
+            ans.Institutionskode,
+            ans.Startdato,
+            ans.Slutdato,
+            ans.Statuskode,
+            org.LOSID
+            perstam.Navn,
+        FROM [Personale].[sd_magistrat].[Ansættelse_mbu] ans
+            right join [Personale].[sd].[personStam] perstam
+                on ans.CPR = perstam.CPR
+            left join [Personale].[sd].[Organisation] org
+                on ans.Afdeling = org.SDafdID
+        WHERE
+            Slutdato > getdate() and Startdato <= getdate()
+            and ans.Overenskomst='47302'
+            and ans.Statuskode in ('1', '3', '5')
+    """
 
     sql = """
         SELECT top(10)
