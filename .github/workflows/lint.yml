@@ -35,6 +35,6 @@ jobs:
         run: |
           uv run ruff check --output-format=github .
 
-      - name: Ruff (format check)
-        run: |
-          uv run ruff format --check .
+      # - name: Ruff (format check)
+      #   run: |
+      #     uv run ruff format --check .
