@@ -19,6 +19,8 @@ def _load_constants():
         var1 = "database=Personale"
         _cached_constants["FaellesDbConnectionString"] = os.getenv("DBCONNECTIONSTRINGFAELLESSQL") + var1
 
+        print(f"PRINTING FAELLES DB CONNECTION STRING: {_cached_constants['FaellesDbConnectionString']}")
+
         _cached_constants["DBCONNECTIONSTRINGPROD"] = os.getenv("DBCONNECTIONSTRINGPROD")
 
         if "--kv1" in sys.argv:
