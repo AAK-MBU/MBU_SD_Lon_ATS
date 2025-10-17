@@ -54,21 +54,21 @@ def kv1(overenskomst: int):
             and ans.Statuskode in ('1', '3', '5')
     """
 
-    sql = """
-        SELECT top(10)
-            ans.Tjenestenummer,
-            ans.Overenskomst,
-            ans.Afdeling,
-            ans.Institutionskode,
-            ans.Startdato,
-            ans.Slutdato,
-            ans.Statuskode
-        FROM [Personale].[sd_magistrat].[Ansættelse_mbu] ans
-        WHERE
-            Slutdato > getdate() and Startdato <= getdate()
-            and ans.Overenskomst='47302'
-            and ans.Statuskode in ('1', '3', '5')
-    """
+    # sql = """
+    #     SELECT top(10)
+    #         ans.Tjenestenummer,
+    #         ans.Overenskomst,
+    #         ans.Afdeling,
+    #         ans.Institutionskode,
+    #         ans.Startdato,
+    #         ans.Slutdato,
+    #         ans.Statuskode
+    #     FROM [Personale].[sd_magistrat].[Ansættelse_mbu] ans
+    #     WHERE
+    #         Slutdato > getdate() and Startdato <= getdate()
+    #         and ans.Overenskomst='47302'
+    #         and ans.Statuskode in ('1', '3', '5')
+    # """
 
     proc_args = PROCESS_CONSTANTS["kv_proc_args"]
     receiver = proc_args.get("notification_receiver", None).upper()
