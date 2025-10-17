@@ -41,8 +41,8 @@ def kv1(overenskomst: int):
             ans.Startdato,
             ans.Slutdato,
             ans.Statuskode,
-            org.LOSID
-            perstam.Navn,
+            org.LOSID,
+            perstam.Navn
         FROM [Personale].[sd_magistrat].[Ansættelse_mbu] ans
             right join [Personale].[sd].[personStam] perstam
                 on ans.CPR = perstam.CPR
