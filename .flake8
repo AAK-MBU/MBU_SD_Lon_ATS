@@ -1,0 +1,5 @@
+[flake8]
+# Ignore specific warning/error codes
+ignore =
+    W503,  # line break before binary operator
+    E501,  # line too long (you can keep this if you're already setting max-line-length)
