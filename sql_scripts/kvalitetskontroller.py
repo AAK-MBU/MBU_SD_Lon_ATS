@@ -44,7 +44,7 @@ def kv1(overenskomst: int):
             Slutdato > getdate() and Startdato <= getdate()
             and ans.Overenskomst={overenskomst}
             and ans.Statuskode in ('1', '3', '5')
-            # and ans.Institutionskode!='XC'
+            -- and ans.Institutionskode!='XC'
     """
 
     proc_args = PROCESS_CONSTANTS["kv_proc_args"]

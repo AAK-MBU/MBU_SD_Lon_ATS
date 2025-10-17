@@ -16,7 +16,7 @@ def _load_constants():
         return
 
     with RPAConnection(db_env="PROD", commit=False) as conn:
-        _cached_constants["FaellesDbConnectionString"] = conn.get_constant("FaellesDbConnectionString").get("value", "")
+        _cached_constants["FaellesDbConnectionString"] = os.getenv("DBCONNECTIONSTRINGFAELLESSQL")
 
         _cached_constants["DBCONNECTIONSTRINGPROD"] = os.getenv("DBCONNECTIONSTRINGPROD")
 
