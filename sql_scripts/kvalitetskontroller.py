@@ -1,9 +1,13 @@
 """Functions that defines errors to be handled by the robot"""
 
+import logging
+
 import pandas as pd
 
 from helpers.helper_functions import get_items_from_query, combine_with_af_email, lis_enheder, sd_enheder
 from helpers.process_constants import PROCESS_CONSTANTS
+
+logger = logging.getLogger(__name__)
 
 
 def kv1(overenskomst: int):
@@ -18,57 +22,27 @@ def kv1(overenskomst: int):
         items (list | None): List of items from the SELECT query. If no elements fits the query then returns None
     """
 
-    # sql = f"""
-    #     SELECT
-    #         ans.Tjenestenummer, ans.Overenskomst, ans.Afdeling, ans.Institutionskode, perstam.Navn, ans.Startdato, ans.Slutdato, ans.Statuskode, org.LOSID
-    #     FROM [Personale].[sd_magistrat].[Ansættelse_mbu] ans
-    #         right join [Personale].[sd].[personStam] perstam
-    #             on ans.CPR = perstam.CPR
-    #         left join [Personale].[sd].[Organisation] org
-    #             on ans.Afdeling = org.SDafdID
-    #     WHERE
-    #         Slutdato > getdate() and Startdato <= getdate()
-    #         and ans.Overenskomst={overenskomst}
-    #         and ans.Statuskode in ('1', '3', '5')
-    #         and ans.Institutionskode!='XC'
-    # """
-    sql = """
-        SELECT top(10)
+    sql = f"""
+        SELECT
             ans.Tjenestenummer,
             ans.Overenskomst,
             ans.Afdeling,
             ans.Institutionskode,
+            perstam.Navn,
             ans.Startdato,
             ans.Slutdato,
             ans.Statuskode,
-            org.LOSID,
-            perstam.Navn
-        FROM [Personale].[sd_magistrat].[Ansættelse_mbu] ans
-            right join [Personale].[sd].[personStam] perstam
-                on ans.CPR = perstam.CPR
-            left join [Personale].[sd].[Organisation] org
-                on ans.Afdeling = org.SDafdID
+            org.LOSID
+        FROM
+            [Personale].[sd_magistrat].[Ansættelse_mbu] ans
+        RIGHT JOIN [Personale].[sd].[personStam] perstam ON ans.CPR = perstam.CPR
+        LEFT JOIN [Personale].[sd].[Organisation] org ON ans.Afdeling = org.SDafdID
         WHERE
             Slutdato > getdate() and Startdato <= getdate()
-            and ans.Overenskomst='47302'
+            and ans.Overenskomst={overenskomst}
             and ans.Statuskode in ('1', '3', '5')
+            and ans.Institutionskode!='XC'
     """
-
-    # sql = """
-    #     SELECT top(10)
-    #         ans.Tjenestenummer,
-    #         ans.Overenskomst,
-    #         ans.Afdeling,
-    #         ans.Institutionskode,
-    #         ans.Startdato,
-    #         ans.Slutdato,
-    #         ans.Statuskode
-    #     FROM [Personale].[sd_magistrat].[Ansættelse_mbu] ans
-    #     WHERE
-    #         Slutdato > getdate() and Startdato <= getdate()
-    #         and ans.Overenskomst='47302'
-    #         and ans.Statuskode in ('1', '3', '5')
-    # """
 
     proc_args = PROCESS_CONSTANTS["kv_proc_args"]
     receiver = proc_args.get("notification_receiver", None).upper()
@@ -77,9 +51,6 @@ def kv1(overenskomst: int):
     connection_string = PROCESS_CONSTANTS["FaellesDbConnectionString"]
 
     items = get_items_from_query(connection_string, sql)
-
-    print(f"len of items, returned from get_items_from_query(): {len(items)}")
-    exit()
 
     if items and af_receiver:
         item_df = pd.DataFrame(items).astype({"LOSID": int}, errors="ignore")

@@ -22,7 +22,6 @@ def retrieve_items_for_queue() -> list[dict]:
     references = []
 
     if "--kv1" not in sys.argv:
-        print("NOT KV1, STOP")
         logger.info("NOT KV1, STOP")
         sys.exit()
 
@@ -57,14 +56,11 @@ def retrieve_items_for_queue() -> list[dict]:
     # Get items for process
     retrieved_items = control_procedure(**procedure_params)
 
-    print(f"len of retrieved_items: {len(retrieved_items)}")
-    sys.exit()
-
     if retrieved_items:
-        for i, item in retrieved_items:
+        for i, item in enumerate(retrieved_items):
             references.append(f"{process}_{datetime.now().strftime('%d%m%y')}_{i+1}")
 
-            formatted_item = json.dumps(helper_functions.format_item(item), ensure_ascii=False)
+            formatted_item = helper_functions.format_item(item)
             data.append(formatted_item)
 
         logger.info(f"Populated queue with {len(retrieved_items)} items.")

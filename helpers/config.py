@@ -2,6 +2,7 @@
 
 from helpers.tillaeg_pairs import tillaeg_pairs
 
+from helpers import email_handler
 from sql_scripts import kvalitetskontroller
 
 MAX_RETRY = 10
@@ -86,4 +87,9 @@ PROCESS_PROCEDURE_DICT = {
             "leder_overenskomst": (45082, 45081, 46901, 45101, 47201),
         },
     },
+}
+
+
+WORKER_MAP = {
+    "Send mail": email_handler.handle_email,
 }
