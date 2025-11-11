@@ -23,7 +23,20 @@ logger = logging.getLogger(__name__)
 # ╔══════════════════════════════════════════════╗
 # ║ 🔥 REMOVE BEFORE DEPLOYMENT (TEMP OVERRIDES) 🔥 ║
 # ╚══════════════════════════════════════════════╝
-# This block disables SSL verification and overrides env vars
+### This block handles the workqueue id selection
+# import os
+# from dotenv import load_dotenv
+# load_dotenv()
+# if "--kv1" in sys.argv:
+#     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV1")
+
+# elif "--kv3" in sys.argv:
+#     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV3")
+
+# elif "--kv4" in sys.argv:
+#     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV4")
+
+# ### This block disables SSL verification ###
 # import requests
 # import urllib3
 # urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -43,9 +56,6 @@ async def populate_queue(workqueue: Workqueue):
     logger.info("Populating workqueue...")
 
     items_to_queue = retrieve_items_for_queue()
-
-    print(f"reached after items to queue, len: {len(items_to_queue)}")
-    sys.exit()
 
     queue_references = {str(r) for r in ats_functions.get_workqueue_items(workqueue)}
 
@@ -94,7 +104,7 @@ async def process_workqueue(workqueue: Workqueue):
                     except BusinessError as e:
                         context = ErrorContext(
                             item=item,
-                            action=item.pending_user,
+                            action=item.pending_user(str(e)),
                             send_mail=False,
                             process_name=workqueue.name,
                         )
@@ -160,20 +170,11 @@ if __name__ == "__main__":
     prod_workqueue = ats.workqueue()
     process = ats.process
 
-    if "--kv1" not in sys.argv:
-        print("NOT KV1, STOP")
-        logger.info("NOT KV1, STOP")
-        sys.exit()
-
     if "--queue" in sys.argv:
         asyncio.run(populate_queue(prod_workqueue))
 
-        sys.exit()  # REMOVE
+    if "--process" in sys.argv:
+        asyncio.run(process_workqueue(prod_workqueue))
 
-    # if "--process" in sys.argv:
-    #     asyncio.run(process_workqueue(prod_workqueue))
-
-    # if "--finalize" in sys.argv:
-    #     asyncio.run(finalize(prod_workqueue))
-
-    sys.exit(0)
+    if "--finalize" in sys.argv:
+        asyncio.run(finalize(prod_workqueue))

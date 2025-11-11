@@ -1,58 +1,75 @@
 """Module to contain different workers"""
 
-import json
+import logging
+
 import re
 
-from helpers.smtp_util import send_email
-from OpenOrchestrator.database.queues import QueueElement
-from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
+from helpers import smtp_util
 from helpers.helper_functions import (
-    find_pair_info,  # , find_match_ovk
+    find_pair_info,
+    # find_match_ovk
 )
 from helpers.tillaeg_pairs import tillaeg_pairs
+from helpers.process_constants import PROCESS_CONSTANTS
+
+logger = logging.getLogger(__name__)
 
 
-def send_mail(
-    orchestrator_connection: OrchestratorConnection,
+def handle_email(
+    data: dict,
     process_type: str,
     notification_receiver: str,
-    queue_element: QueueElement,
 ):
     """Function to send email to inputted receiver"""
+
     receiver = notification_receiver
-    email_body, email_subject = construct_worker_text(
-        process_type=process_type, queue_element=queue_element
+
+    sender = PROCESS_CONSTANTS["e-mail_noreply"]
+
+    email_subject, email_body = construct_worker_text(
+        process_type=process_type,
+        data=data
     )
 
-    send_email(
-        receiver=receiver,
-        sender=orchestrator_connection.get_constant("e-mail_noreply").value,
+    # REMOVE IN PROD
+    print(f"receiver: {receiver}")
+    if receiver != "dadj@aarhus.dk":
+        logger.info("receiver IS NOT CORRECT !!!")
+        import sys
+        sys.exit()
+    # REMOVE IN PROD
+
+    smtp_util.send_email(
+        receiver="dadj@aarhus.dk",  # CHANGE TO receiver=receiver IN PROD
+        sender=sender,
         subject=email_subject,
         body=email_body,
-        smtp_server=orchestrator_connection.get_constant("smtp_server").value,
-        smtp_port=orchestrator_connection.get_constant("smtp_port").value,
+        smtp_server=PROCESS_CONSTANTS["smtp_server"],
+        smtp_port=PROCESS_CONSTANTS["smtp_port"],
         html_body=True,
     )
 
-    orchestrator_connection.log_trace(f"E-mail sent to {receiver}")
+    logger.info(f"E-mail sent to {receiver}")
 
 
-def construct_worker_text(process_type: str, queue_element: QueueElement):
-    """Function to construct text for different the processes"""
-    element_data = json.loads(queue_element.data)
-    text = ""
+def construct_worker_text(process_type: str, data: dict):
+    """Function to construct text for the different processes"""
+
     subject = ""
+    text = ""
 
-    person_id = element_data.get("Tjenestenummer", None)
-    person_name = element_data.get("Navn", None)
-    overenskomst = element_data.get("Overenskomst", None)
-    afdeling = element_data.get("Afdeling", None)
-    sd_inst_kode = element_data.get("Institutionskode", None)
-    enhedsnavn = element_data.get("Enhedsnavn", None)
+    person_id = data.get("Tjenestenummer", None)
+    person_name = data.get("Navn", None)
+    overenskomst = data.get("Overenskomst", None)
+    afdeling = data.get("Afdeling", None)
+    sd_inst_kode = data.get("Institutionskode", None)
+    enhedsnavn = data.get("Enhedsnavn", None)
 
+    # Inspirationsansættelser
     if process_type == "KV1":
-        # Inspirationsansættelser
         instruction_link = "https://intranet.aarhuskommune.dk/documents/146889"
+
+        subject = "Inspirationsansættelse på XA institution"
 
         text = (
             "<p>Der er ved en fejl blevet oprettet en inspirationsansættelse på en XA enhed i jeres Administrative Fællesskab. <br>"
@@ -69,17 +86,13 @@ def construct_worker_text(process_type: str, queue_element: QueueElement):
             + "-" * 100
         )
 
-        subject = "Inspirationsansættelse på XA institution"
-
-        return text, subject
-
-    if process_type == "KV2":
-        # Manglende tillægsnummer
-        # Get element info
+    # Manglende tillægsnummer
+    elif process_type == "KV2":
         # Initialize found pair
-        found_number = int(element_data["Tillægsnummer"])
-        found_name = element_data["Tillægsnavn"]
+        found_number = int(data["Tillægsnummer"])
+        found_name = data["Tillægsnavn"]
         found_type = re.search(pattern=r"([A|B])-(?!.*-)", string=found_name).group(1)
+
         # Initialize supposed match
         match_number = None
         match_name = None
@@ -92,6 +105,8 @@ def construct_worker_text(process_type: str, queue_element: QueueElement):
                 match_type = re.search(
                     pattern=r"([A|B])-(?!.*-)", string=match_name
                 ).group(1)
+
+        subject = "Manglende tillægsnummer i ansættelse"
 
         # Construct message
         text = (
@@ -107,13 +122,13 @@ def construct_worker_text(process_type: str, queue_element: QueueElement):
             + "Ved rettelse af denne fejl skal lønsammensætningen kontrolleres. Ved spørgsmål, kontakt da Personale."
         )
 
-        subject = "Manglende tillægsnummer i ansættelse"
+    # Forkert overenskomst skole/dagtilbud
+    elif process_type in ("KV3", "KV3-DEV"):
 
-    if process_type in ("KV3", "KV3-DEV"):
-        # Forker overenskomst skole/dagtilbud
-
-        afdtype_txt = element_data["afdtype_txt"]
+        afdtype_txt = data["afdtype_txt"]
         # exp_ovk = find_match_ovk(overenskomst)
+
+        subject = "Fejl i SD-overenskomst"
 
         text = (
             "<h4>Følgende ansættelse er oprettet med en forkert SD overenskomst:</h4>"
@@ -126,11 +141,11 @@ def construct_worker_text(process_type: str, queue_element: QueueElement):
             # + f"<p>Forventet overenskomst: {exp_ovk}</p>"
         )
 
-        subject = "Fejl i SD-overenskomst"
-
-    if process_type == "KV4":
-        # Manglende låst anciennitetsdato
+    # Manglende låst anciennitetsdato
+    elif process_type == "KV4":
         instruction_link = "https://aarhuskommune.sharepoint.com/sites/IntranetDocumentSite/Intranetdokumentbibliotek/Forms/Seneste%20dokumenter.aspx?id=%2Fsites%2FIntranetDocumentSite%2FIntranetdokumentbibliotek%2FL%C3%A5st%20p%C3%A5%20grundl%C3%B8nstrin%2Epdf&parent=%2Fsites%2FIntranetDocumentSite%2FIntranetdokumentbibliotek&p=true&ga=1"
+
+        subject = "Manglende låst anciennitet på leder"
 
         text = (
             "<h4>Følgende leder har ikke fået fastlåst sin anciennitetsdato til dato 31.12.9999:</h4>"
@@ -144,11 +159,4 @@ def construct_worker_text(process_type: str, queue_element: QueueElement):
             + "OBS hvis der er tilknyttet et grundlønstillæg til stillingen skal du huske at oprette dette manuelt (måske er tillægget allerede oprettet, se lønsammensætning)."
         )
 
-        subject = "Manglende låst anciennitet på leder"
-
-    return text, subject
-
-
-WORKER_MAP = {
-    "Send mail": send_mail,
-}
+    return subject, text

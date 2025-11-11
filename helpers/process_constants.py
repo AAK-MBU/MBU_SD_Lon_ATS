@@ -16,10 +16,7 @@ def _load_constants():
         return
 
     with RPAConnection(db_env="PROD", commit=False) as conn:
-        var1 = "database=Personale"
-        _cached_constants["FaellesDbConnectionString"] = os.getenv("DBCONNECTIONSTRINGFAELLESSQL") + var1
-
-        print(f"PRINTING FAELLES DB CONNECTION STRING: {_cached_constants['FaellesDbConnectionString']}")
+        _cached_constants["FaellesDbConnectionString"] = os.getenv("DBCONNECTIONSTRINGFAELLESSQL")
 
         _cached_constants["DBCONNECTIONSTRINGPROD"] = os.getenv("DBCONNECTIONSTRINGPROD")
 
@@ -32,6 +29,10 @@ def _load_constants():
         elif "--kv4" in sys.argv:
             _cached_constants["kv_proc_args"] = json.loads(conn.get_constant("sdloen_kv4_procargs").get("value", "{}"))
 
+        _cached_constants["e-mail_noreply"] = conn.get_constant("e-mail_noreply").get("value", "")
+
+        _cached_constants["smtp_server"] = conn.get_constant("smtp_adm_server").get("value", "")
+        _cached_constants["smtp_port"] = conn.get_constant("smtp_port").get("value", "")
 
 class Constants(dict):
     """

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def combine_with_af_email(item_df: pd.DataFrame):
     """Combines items with AF emails from LIS database"""
 
-    connection_string_mbu = PROCESS_CONSTANTS["db_connection_string"]
+    connection_string_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRINGPROD"]
 
     af_email = af_losid(connection_str=connection_string_mbu)
     af_email_df = pd.DataFrame(af_email).astype({"LOSID": int}, errors="ignore")
@@ -100,22 +100,28 @@ def get_items_from_query(connection_string, query: str):
                 columns = [column[0] for column in cursor.description]
 
                 # Convert to list of dictionaries
-                result = [dict(zip(columns, row)) for row in rows]
+                result = [
+                    {
+                        column: value.strip() if isinstance(value, str) else value
+                        for column, value in zip(columns, row)
+                    }
+                    for row in rows
+                ]
 
     except pyodbc.Error as e:
-        print(f"Database error: {str(e)}")
-        print(f"{connection_string}")
+        logger.info(f"Database error: {str(e)}")
+        logger.info(f"{connection_string}")
 
         raise e
 
     except ValueError as e:
-        print(f"Value error: {str(e)}")
+        logger.info(f"Value error: {str(e)}")
 
         raise e
 
     # pylint: disable-next = broad-exception-caught
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+        logger.info(f"An unexpected error occurred: {str(e)}")
 
         raise e
 
@@ -129,19 +135,22 @@ def lis_enheder(connection_string: str, afdtype: tuple | None = None):
 
     sql = """
         SELECT
-            distinct lisid, losid, enhnavn, afdtype, afdtype_txt
+            distinct lisid,
+            losid,
+            enhnavn,
+            afdtype,
+            afdtype_txt
         FROM
             [BuMasterdata].[dbo].[VIEW_MD_STAMDATA_AKTUEL]
     """
 
-    sql += (
-        f"""
-            WHERE
-                afdtype in {afdtype}
-        """
-        if afdtype
-        else ""
-    )
+    if afdtype:
+        sql += (
+            f"""
+                WHERE
+                    afdtype IN {afdtype}
+            """
+        )
 
     departments = get_items_from_query(connection_string=connection_string, query=sql)
 
@@ -153,19 +162,19 @@ def sd_enheder(connection_string: str, losid_tuple: tuple | None = None):
 
     sql = """
         SELECT
-            SDafdID, LOSID
+            SDafdID,
+            LOSID
         FROM
             [Personale].[sd].[Organisation]
     """
 
-    sql += (
-        f"""
-            WHERE
-                LOSID in {losid_tuple}
-        """
-        if losid_tuple
-        else ""
-    )
+    if losid_tuple:
+        sql += (
+            f"""
+                WHERE
+                    LOSID IN {losid_tuple}
+            """
+        )
 
     departments = get_items_from_query(connection_string=connection_string, query=sql)
 
@@ -182,7 +191,8 @@ def af_losid(connection_str: str):
     FROM
         (
         SELECT
-            adm_faelles_id, lisid
+            adm_faelles_id,
+            lisid
         FROM
             [BuMasterdata].[dbo].[MD_ADM_FAELLESSKAB]
         WHERE
