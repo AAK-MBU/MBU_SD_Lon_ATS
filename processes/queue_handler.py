@@ -1,6 +1,5 @@
 """Module to hande queue population"""
 
-import sys
 import asyncio
 import json
 import logging
@@ -20,10 +19,6 @@ def retrieve_items_for_queue() -> list[dict]:
     """Function to populate queue"""
     data = []
     references = []
-
-    if "--kv1" not in sys.argv:
-        logger.info("NOT KV1, STOP")
-        sys.exit()
 
     proc_args = ""
 

@@ -4,7 +4,7 @@ import logging
 
 import pandas as pd
 
-from helpers.helper_functions import get_items_from_query, combine_with_af_email, lis_enheder, sd_enheder
+from helpers import helper_functions
 from helpers.process_constants import PROCESS_CONSTANTS
 
 logger = logging.getLogger(__name__)
@@ -35,8 +35,10 @@ def kv1(overenskomst: int):
             org.LOSID
         FROM
             [Personale].[sd_magistrat].[Ansættelse_mbu] ans
-        RIGHT JOIN [Personale].[sd].[personStam] perstam ON ans.CPR = perstam.CPR
-        LEFT JOIN [Personale].[sd].[Organisation] org ON ans.Afdeling = org.SDafdID
+        RIGHT JOIN
+            [Personale].[sd].[personStam] perstam ON ans.CPR = perstam.CPR
+        LEFT JOIN
+            [Personale].[sd].[Organisation] org ON ans.Afdeling = org.SDafdID
         WHERE
             Slutdato > getdate() and Startdato <= getdate()
             and ans.Overenskomst={overenskomst}
@@ -50,12 +52,12 @@ def kv1(overenskomst: int):
 
     connection_string = PROCESS_CONSTANTS["FaellesDbConnectionString"]
 
-    items = get_items_from_query(connection_string, sql)
+    items = helper_functions.get_items_from_query(connection_string, sql)
 
     if items and af_receiver:
         item_df = pd.DataFrame(items).astype({"LOSID": int}, errors="ignore")
 
-        items = combine_with_af_email(item_df=item_df)
+        items = helper_functions.combine_with_af_email(item_df=item_df)
 
     return items
 
@@ -112,7 +114,7 @@ def kv2(tillaegsnr_par: list):
             )
         """
 
-        pair_items = get_items_from_query(connection_string, sql)
+        pair_items = helper_functions.get_items_from_query(connection_string, sql)
         if not items:
             items = pair_items
 
@@ -124,12 +126,12 @@ def kv2(tillaegsnr_par: list):
 
     connection_string_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRINGPROD"]
 
-    lis_dep = lis_enheder(connection_string=connection_string_mbu)
+    lis_dep = helper_functions.lis_enheder(connection_string=connection_string_mbu)
     lis_df = pd.DataFrame(lis_dep).rename(columns={"losid": "LOSID"})
     lis_df = lis_df[~lis_df["LOSID"].isna()].copy(deep=True)
     lis_df["LOSID"] = lis_df["LOSID"].astype(int, errors="ignore")
 
-    sd_dep = sd_enheder(connection_string=connection_string)
+    sd_dep = helper_functions.sd_enheder(connection_string=connection_string)
     sd_df = pd.DataFrame(sd_dep)
     sd_df = sd_df[~sd_df["LOSID"].isna()].copy(deep=True)
     sd_df["LOSID"] = sd_df["LOSID"].astype(int, errors="ignore")
@@ -162,23 +164,24 @@ def kv3(
 ):
     """Ansættelser with wrong overenskomst based on departmentype"""
 
-    connection_string_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRING"]
+    connection_string_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRINGPROD"]
     connection_string_faelles = PROCESS_CONSTANTS["FaellesDbConnectionString"]
 
     # Load department types from LIS stamdata
-    lis_stamdata = lis_enheder(
+    lis_stamdata = helper_functions.lis_enheder(
         connection_string=connection_string_mbu, afdtype=(2, 3, 4, 5, 11, 13)
     )
     losid_tuple = tuple(i["losid"] for i in lis_stamdata)
 
     # Load corresponding SD department codes
-    sd_departments = sd_enheder(
+    sd_departments = helper_functions.sd_enheder(
         losid_tuple=losid_tuple, connection_string=connection_string_faelles
     )
 
     # Combine SD and LIS data
     lis_stamdata_df = pd.DataFrame(lis_stamdata).rename(columns={"losid": "LOSID"})
     lis_stamdata_df["LOSID"] = lis_stamdata_df["LOSID"].astype(int)
+
     sd_departments_df = pd.DataFrame(sd_departments)
     sd_departments_df["LOSID"] = sd_departments_df["LOSID"].astype(int)
 
@@ -235,23 +238,77 @@ def kv3(
     return items
 
 
+def kv3_1(
+    connection_str: str,
+    skole_afd: tuple,
+    dagtilbud_afd: tuple,
+    accept_ovk_skole: tuple,
+    accept_ovk_dag: tuple,
+):
+    """Get wrong overenskomst in skole and dagtilbud respectively"""
+    accept_dag_str = (
+        f"AND Overenskomst NOT IN {accept_ovk_dag}" if len(accept_ovk_dag) != 0 else ""
+    )
+    accept_skole_str = (
+        f"AND Overenskomst NOT IN {accept_ovk_skole}"
+        if len(accept_ovk_skole) != 0
+        else ""
+    )
+    sql = f"""
+        SELECT
+            ans.Tjenestenummer,
+            ans.Overenskomst,
+            ans.Afdeling,
+            ans.Institutionskode,
+            perstam.Navn,
+            ans.Startdato,
+            ans.Slutdato,
+            ans.Statuskode
+        FROM
+            [Personale].[sd_magistrat].[Ansættelse_mbu] ans
+        LEFT JOIN
+            [Personale].[sd].[personStam] AS perstam ON ans.CPR = perstam.CPR
+        WHERE
+            (
+                (
+                    Afdeling IN {dagtilbud_afd}
+                    AND Overenskomst IN (76001, 76101, 77001)
+                    {accept_dag_str}
+                )
+                OR
+                (
+                    Afdeling IN {skole_afd}
+                    AND Overenskomst IN (46001, 46101)
+                    {accept_skole_str}
+                )
+            )
+            AND Statuskode in ('1', '3', '5')
+            AND Startdato <= GETDATE()
+            AND Slutdato > GETDATE()
+    """
+
+    items = helper_functions.get_items_from_query(connection_string=connection_str, query=sql)
+
+    return items
+
+
 def kv3_dev(
     accept_ovk_dag: tuple,
     accept_ovk_skole: tuple,
 ):
     """Ansættelser with wrong overenskomst based on departmentype"""
 
-    connection_string_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRING"]
+    connection_string_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRINGPROD"]
     connection_string_faelles = PROCESS_CONSTANTS["FaellesDbConnectionString"]
 
     # Load department types from LIS stamdata
-    lis_stamdata = lis_enheder(
+    lis_stamdata = helper_functions.lis_enheder(
         connection_string=connection_string_mbu, afdtype=(2, 3, 4, 5, 11, 13)
     )
     losid_tuple = tuple(i["losid"] for i in lis_stamdata)
 
     # Load corresponding SD department codes
-    sd_departments = sd_enheder(
+    sd_departments = helper_functions.sd_enheder(
         losid_tuple=losid_tuple, connection_string=connection_string_faelles
     )
 
@@ -280,7 +337,7 @@ def kv3_dev(
     skole_afd = tuple(skole_df["SDafdID"].values)
 
     # Collect ansættelser with wrong overenskomst
-    items = kv3_1_dev(
+    items = kv3_dev_1(
         connection_str=connection_string_faelles,
         skole_afd=skole_afd,
         dagtilbud_afd=dagtilbud_afd,
@@ -318,7 +375,7 @@ def kv3_dev(
     return items
 
 
-def kv3_1_dev(
+def kv3_dev_1(
     connection_str: str,
     skole_afd: tuple,
     dagtilbud_afd: tuple,
@@ -359,50 +416,7 @@ def kv3_1_dev(
             and Startdato <= GETDATE()
             and Slutdato > GETDATE()
     """
-    items = get_items_from_query(connection_string=connection_str, query=sql)
-    return items
-
-
-def kv3_1(
-    connection_str: str,
-    skole_afd: tuple,
-    dagtilbud_afd: tuple,
-    accept_ovk_skole: tuple,
-    accept_ovk_dag: tuple,
-):
-    """Get wrong overenskomst in skole and dagtilbud respectively"""
-    accept_dag_str = (
-        f"and Overenskomst not in {accept_ovk_dag}" if len(accept_ovk_dag) != 0 else ""
-    )
-    accept_skole_str = (
-        f"and Overenskomst not in {accept_ovk_skole}"
-        if len(accept_ovk_skole) != 0
-        else ""
-    )
-    sql = f"""
-        SELECT
-            ans.Tjenestenummer, ans.Overenskomst, ans.Afdeling, ans.Institutionskode, perstam.Navn, ans.Startdato, ans.Slutdato, ans.Statuskode
-        FROM
-            [Personale].[sd_magistrat].[Ansættelse_mbu] ans
-            left join [Personale].[sd].[personStam] as perstam
-            on ans.CPR = perstam.CPR
-        WHERE
-            ((
-                Afdeling in {dagtilbud_afd}
-                and Overenskomst in (76001, 76101, 77001)
-                {accept_dag_str}
-            )
-            or
-            (
-                Afdeling in {skole_afd}
-                and Overenskomst in (46001, 46101)
-                {accept_skole_str}
-            ))
-            and Statuskode in ('1', '3', '5')
-            and Startdato <= GETDATE()
-            and Slutdato > GETDATE()
-    """
-    items = get_items_from_query(connection_string=connection_str, query=sql)
+    items = helper_functions.get_items_from_query(connection_string=connection_str, query=sql)
     return items
 
 
@@ -433,10 +447,10 @@ def kv4(leder_overenskomst: tuple):
 
     connection_string = PROCESS_CONSTANTS["FaellesDbConnectionString"]
 
-    items = get_items_from_query(connection_string, sql)
+    items = helper_functions.get_items_from_query(connection_string, sql)
     if items and af_receiver:
         item_df = pd.DataFrame(items).astype({"LOSID": int}, errors="ignore")
 
-        items = combine_with_af_email(item_df=item_df)
+        items = helper_functions.combine_with_af_email(item_df=item_df)
 
     return items

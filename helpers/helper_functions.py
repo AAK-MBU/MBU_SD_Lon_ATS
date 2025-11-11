@@ -135,19 +135,22 @@ def lis_enheder(connection_string: str, afdtype: tuple | None = None):
 
     sql = """
         SELECT
-            distinct lisid, losid, enhnavn, afdtype, afdtype_txt
+            distinct lisid,
+            losid,
+            enhnavn,
+            afdtype,
+            afdtype_txt
         FROM
             [BuMasterdata].[dbo].[VIEW_MD_STAMDATA_AKTUEL]
     """
 
-    sql += (
-        f"""
-            WHERE
-                afdtype in {afdtype}
-        """
-        if afdtype
-        else ""
-    )
+    if afdtype:
+        sql += (
+            f"""
+                WHERE
+                    afdtype IN {afdtype}
+            """
+        )
 
     departments = get_items_from_query(connection_string=connection_string, query=sql)
 
@@ -159,19 +162,19 @@ def sd_enheder(connection_string: str, losid_tuple: tuple | None = None):
 
     sql = """
         SELECT
-            SDafdID, LOSID
+            SDafdID,
+            LOSID
         FROM
             [Personale].[sd].[Organisation]
     """
 
-    sql += (
-        f"""
-            WHERE
-                LOSID in {losid_tuple}
-        """
-        if losid_tuple
-        else ""
-    )
+    if losid_tuple:
+        sql += (
+            f"""
+                WHERE
+                    LOSID IN {losid_tuple}
+            """
+        )
 
     departments = get_items_from_query(connection_string=connection_string, query=sql)
 
@@ -188,7 +191,8 @@ def af_losid(connection_str: str):
     FROM
         (
         SELECT
-            adm_faelles_id, lisid
+            adm_faelles_id,
+            lisid
         FROM
             [BuMasterdata].[dbo].[MD_ADM_FAELLESSKAB]
         WHERE

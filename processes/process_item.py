@@ -3,11 +3,8 @@
 
 import logging
 
-from helpers import email_handler
-
-from helpers.process_constants import PROCESS_CONSTANTS
-
 from helpers.config import WORKER_MAP
+from helpers.process_constants import PROCESS_CONSTANTS
 
 logger = logging.getLogger(__name__)
 

@@ -34,7 +34,7 @@ elif "--kv3" in sys.argv:
     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV3")
 
 elif "--kv4" in sys.argv:
-    os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV3")
+    os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV4")
 
 ### This block disables SSL verification ###
 import requests
@@ -170,19 +170,11 @@ if __name__ == "__main__":
     prod_workqueue = ats.workqueue()
     process = ats.process
 
-    if "--kv1" not in sys.argv:
-        logger.info("NOT KV1, STOP")
-        sys.exit()
-
     if "--queue" in sys.argv:
         asyncio.run(populate_queue(prod_workqueue))
-
-        sys.exit()  # REMOVE
 
     if "--process" in sys.argv:
         asyncio.run(process_workqueue(prod_workqueue))
 
-    # if "--finalize" in sys.argv:
-    #     asyncio.run(finalize(prod_workqueue))
-
-    sys.exit(0)
+    if "--finalize" in sys.argv:
+        asyncio.run(finalize(prod_workqueue))
