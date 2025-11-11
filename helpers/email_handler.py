@@ -40,8 +40,7 @@ def handle_email(
     # REMOVE IN PROD
 
     smtp_util.send_email(
-        receiver="dadj@aarhus.dk",  # REMOVE IN PROD
-        # receiver=receiver,  # UNCOMMENT IN PROD
+        receiver="dadj@aarhus.dk",  # CHANGE TO receiver=receiver IN PROD
         sender=sender,
         subject=email_subject,
         body=email_body,
