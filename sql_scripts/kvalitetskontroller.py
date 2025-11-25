@@ -214,6 +214,10 @@ def kv3(
     )
     items_df = pd.DataFrame(items)
 
+    if items_df.empty:
+        logger.info("KV3: No wrong overenskomster found. Returning empty result.")
+        return []
+
     # Combine with other information
     combined_df = pd.merge(
         left=combined_df, right=items_df, left_on="SDafdID", right_on="Afdeling"
@@ -286,6 +290,8 @@ def kv3_1(
             AND Startdato <= GETDATE()
             AND Slutdato > GETDATE()
     """
+
+    logger.info(f"printing the full sql:\n\n{sql}\n\n")
 
     items = helper_functions.get_items_from_query(connection_string=connection_str, query=sql)
 

@@ -23,28 +23,28 @@ logger = logging.getLogger(__name__)
 # ╔══════════════════════════════════════════════╗
 # ║ 🔥 REMOVE BEFORE DEPLOYMENT (TEMP OVERRIDES) 🔥 ║
 # ╚══════════════════════════════════════════════╝
-### This block handles the workqueue id selection
-# import os
-# from dotenv import load_dotenv
-# load_dotenv()
-# if "--kv1" in sys.argv:
-#     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV1")
+### This block handles the workqueue id selection ###
+import os
+from dotenv import load_dotenv
+load_dotenv()
+if "--kv1" in sys.argv:
+    os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV1")
 
-# elif "--kv3" in sys.argv:
-#     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV3")
+elif "--kv3" in sys.argv:
+    os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV3")
 
-# elif "--kv4" in sys.argv:
-#     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV4")
+elif "--kv4" in sys.argv:
+    os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV4")
 
-# ### This block disables SSL verification ###
-# import requests
-# import urllib3
-# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-# _old_request = requests.Session.request
-# def unsafe_request(self, *args, **kwargs):
-#     kwargs['verify'] = False
-#     return _old_request(self, *args, **kwargs)
-# requests.Session.request = unsafe_request
+### This block disables SSL verification ###
+import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+_old_request = requests.Session.request
+def unsafe_request(self, *args, **kwargs):
+    kwargs['verify'] = False
+    return _old_request(self, *args, **kwargs)
+requests.Session.request = unsafe_request
 # ╔══════════════════════════════════════════════╗
 # ║ 🔥 REMOVE BEFORE DEPLOYMENT (TEMP OVERRIDES) 🔥 ║
 # ╚══════════════════════════════════════════════╝
