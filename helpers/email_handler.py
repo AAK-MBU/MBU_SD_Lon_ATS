@@ -15,11 +15,7 @@ from helpers.process_constants import PROCESS_CONSTANTS
 logger = logging.getLogger(__name__)
 
 
-def handle_email(
-    data: dict,
-    process_type: str,
-    notification_receiver: str,
-):
+def handle_email(data: dict, process_type: str, notification_receiver: str):
     """Function to send email to inputted receiver"""
 
     receiver = notification_receiver
@@ -31,16 +27,8 @@ def handle_email(
         data=data
     )
 
-    # REMOVE IN PROD
-    print(f"receiver: {receiver}")
-    if receiver != "dadj@aarhus.dk":
-        logger.info("receiver IS NOT CORRECT !!!")
-        import sys
-        sys.exit()
-    # REMOVE IN PROD
-
     smtp_util.send_email(
-        receiver="dadj@aarhus.dk",  # CHANGE TO receiver=receiver IN PROD
+        receiver=receiver,
         sender=sender,
         subject=email_subject,
         body=email_body,

@@ -155,6 +155,11 @@ def kv2(tillaegsnr_par: list):
 
     items = list(items_dep.T.to_dict().values())
 
+    if not items:
+        logger.info("KV2: No tillægsnummer issues found. Returning empty.")
+
+        return []
+
     return items
 
 
@@ -216,6 +221,7 @@ def kv3(
 
     if items_df.empty:
         logger.info("KV3: No wrong overenskomster found. Returning empty result.")
+
         return []
 
     # Combine with other information
