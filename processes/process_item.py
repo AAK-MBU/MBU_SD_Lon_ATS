@@ -18,14 +18,10 @@ def process_item(item_data: dict, item_reference: str):
 
     process_type = proc_args.get("process").upper()
     notification_type = proc_args.get("notification_type")
-    # notification_receiver = proc_args.get("notification_receiver")  UNCOMMENT IN PROD
+    notification_receiver = proc_args.get("notification_receiver")
 
-    # UNCOMMENT IN PROD
-    # if notification_receiver == "AF":
-    #     notification_receiver = data.get("AF_email")
-    # UNCOMMENT IN PROD
-
-    notification_receiver = "dadj@aarhus.dk"  # REMOVE IN PROD
+    if notification_receiver == "AF":
+        notification_receiver = item_data.get("AF_email")
 
     # Find and apply worker
     worker = WORKER_MAP.get(notification_type, None)
