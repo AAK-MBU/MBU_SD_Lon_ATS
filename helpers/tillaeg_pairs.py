@@ -77,4 +77,6 @@ tillaeg_pairs = [
      'pair_names': ('BU6931-O-021B-Pædagogisk fagkons.', 'BU6931-O-021A-Pædagogisk fagkons.')},
     {'ovk': 47501, 'pair': (183513, 183538),
      'pair_names': ('BU7501-O-024A-Selvstændighed/kostplanlæg', 'BU7501-O-024B-Selvstændighed/kostplanlæg')},
+    {'ovk': 46601, 'pair': (188714, 188716),
+     'pair_names': ('BU6601-O-091A-Morgtlf. Bkp (1 trin)', 'BU6601-O-091B-Morgtlf. Bkp (1.000 kr.)')},
 ]

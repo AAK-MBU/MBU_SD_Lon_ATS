@@ -147,4 +147,43 @@ def construct_worker_text(process_type: str, data: dict):
             + "OBS hvis der er tilknyttet et grundlønstillæg til stillingen skal du huske at oprette dette manuelt (måske er tillægget allerede oprettet, se lønsammensætning)."
         )
 
+    # Medarbejder tilkoblet forkert TRIO SKOLEKODE
+    elif process_type == "KV5":
+        error = data.get("Error")
+        Folder_date = data.get("Folder_date")
+        file_name = data.get("File_name")
+        trio_school_code = data.get("Trio_school_code")
+
+
+        if error == "NO_ACTIVE_XA_EMPLOYMENT":
+            subject = "Ikke eksisterende medarbejder fundet i lønudtræk"
+
+            # Construct message
+            text = (
+                "<h4>Følgende tjenestenummer er fundet i et lønudtræk, men eksisterer ikke i MBU's ansættelsesdata</h4>"
+                + f"<p>Tjenestenummer: {person_id}</p>"
+                + "<p>Tjenestenummeret blev fundet i et lønudtræk for skole med følgende skolekode:</p>"
+                + f"<p>TRIO skolekode: {trio_school_code}</p>"
+                + f"<p>Dato for lønudtrækket: {Folder_date}</p>"
+                + f"<p>Filnavn: {file_name}</p>"
+            )
+
+        else:
+            allowed_sd = data.get("Allowed_sd")
+
+            subject = "Medarbejder er tilkoblet forkert TRIO skolekode"
+
+            # Construct message
+            text = (
+                "<h4>Følgende medarbejder er tilkoblet den forkerte TRIO skolekode, på baggrund af den SD Afdelingskode, de står med i deres ansættelse</h4>"
+                + f"<p>Tjenestenummer: {person_id}</p>"
+                + f"<p>Navn: {person_name}</p>"
+                + f"<p>Overenskomst: {overenskomst}</p>"
+                + f"<p>SD institutionskode: {sd_inst_kode}</p>"
+                + f"<p>SD Afdelingskode: {afdeling}</p>"
+                + f"<p>TRIO skolekode: {trio_school_code}</p>"
+                + f"<p>Følgende SD afdelingskoder er tilkoblet skolekode {trio_school_code}:</p>"
+                + f"<p>{allowed_sd}:</p>"
+            )
+
     return subject, text

@@ -23,11 +23,18 @@ def _load_constants():
         if "--kv1" in sys.argv:
             _cached_constants["kv_proc_args"] = json.loads(conn.get_constant("sdloen_kv1_procargs").get("value", "{}"))
 
+        elif "--kv2" in sys.argv:
+            _cached_constants["kv_proc_args"] = json.loads(conn.get_constant("sdloen_kv2_procargs").get("value", "{}"))
+
         elif "--kv3" in sys.argv:
             _cached_constants["kv_proc_args"] = json.loads(conn.get_constant("sdloen_kv3_procargs").get("value", "{}"))
 
         elif "--kv4" in sys.argv:
             _cached_constants["kv_proc_args"] = json.loads(conn.get_constant("sdloen_kv4_procargs").get("value", "{}"))
+
+        ### UPDATE / ADD TO DATABASE !!!
+        elif "--kv5" in sys.argv:
+            _cached_constants["kv_proc_args"] = {"process": "kv5", "notification_type": "Send mail", "notification_receiver": "dadj@aarhus.dk"}
 
         _cached_constants["e-mail_noreply"] = conn.get_constant("e-mail_noreply").get("value", "")
 

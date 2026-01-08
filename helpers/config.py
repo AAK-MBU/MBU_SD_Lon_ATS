@@ -87,6 +87,10 @@ PROCESS_PROCEDURE_DICT = {
             "leder_overenskomst": (45082, 45081, 46901, 45101, 47201),
         },
     },
+    "KV5": {
+        "procedure": kvalitetskontroller.kv5,
+        "parameters": {},
+    },
 }
 
 

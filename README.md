@@ -18,6 +18,18 @@ Robotten foretager følgende kvalitetskontroller af igangværende ansættelser
 4. **Ledere uden udløbsdato på anciennitet** <br>
     Ledere skal ansættes med en "låst" anciennitetsdato (dvs. 9999-12-31). Denne proces tjekker om ledere (defineret ved oversenskomster 45082, 45081, 46901, 45101 og 47201) har anden anciennitetsdato end den låste dato. 
 
+5. **Forkert TRIO-placering i forhold til SD-afdeling (KV5-kontrol)** <br>
+    Denne kontrol verificerer, at medarbejdere i TRIO-lønfilerne er placeret på den korrekte skole/enhed i forhold til deres aktive ansættelse i SD Løn.
+    For hver medarbejder sammenlignes:
+    hvilken TRIO-skole de fremgår af i lønfilen
+    med
+    hvilken SD-afdeling deres aktive XA-ansættelse tilhører
+    En ansættelse anses kun for aktiv, hvis Startdato ≤ dagsdato og Slutdato er NULL eller større end dagsdato.
+    Fejl registreres, hvis:
+    - medarbejderen ikke har nogen aktiv XA-ansættelse
+    - medarbejderen har flere aktive XA-ansættelser (datakvalitetsfejl)
+    - medarbejderens SD-afdeling ikke matcher de tilladte SD-afdelinger for den pågældende TRIO-skole
+
 ## Notifikationstype
 Robotten notificerer relevante modtagere om de fundne fejl. Her vælges mellem følgende muligheder
 

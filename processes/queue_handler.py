@@ -3,6 +3,10 @@
 import asyncio
 import json
 import logging
+import sys
+
+import os
+from pathlib import Path
 
 from datetime import datetime
 
@@ -23,6 +27,8 @@ def retrieve_items_for_queue() -> list[dict]:
     proc_args = ""
 
     proc_args = PROCESS_CONSTANTS["kv_proc_args"]
+
+    logger.info(f"process arguments: {proc_args}")
 
     process = proc_args.get("process", None).upper()
 
@@ -53,7 +59,12 @@ def retrieve_items_for_queue() -> list[dict]:
 
     if retrieved_items:
         for i, item in enumerate(retrieved_items):
-            references.append(f"{process}_{datetime.now().strftime('%d%m%y')}_{i+1}")
+            if "--kv5" in sys.argv:
+                reference = f"{process}_{datetime.now().strftime('%d%m%y')}_{item.get('Tjenestenummer')}"
+                references.append(reference)
+
+            else:
+                references.append(f"{process}_{datetime.now().strftime('%d%m%y')}_{i+1}")
 
             formatted_item = helper_functions.format_item(item)
             data.append(formatted_item)
