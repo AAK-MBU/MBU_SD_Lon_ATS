@@ -18,13 +18,8 @@ Robotten foretager følgende kvalitetskontroller af igangværende ansættelser
 4. **Ledere uden udløbsdato på anciennitet** <br>
     Ledere skal ansættes med en "låst" anciennitetsdato (dvs. 9999-12-31). Denne proces tjekker om ledere (defineret ved oversenskomster 45082, 45081, 46901, 45101 og 47201) har anden anciennitetsdato end den låste dato. 
 
-5. **Forkert TRIO-placering i forhold til SD-afdeling (KV5-kontrol)** <br>
-    Denne kontrol verificerer, at medarbejdere i TRIO-lønfilerne er placeret på den korrekte skole/enhed i forhold til deres aktive ansættelse i SD Løn.
-    For hver medarbejder sammenlignes:
-    hvilken TRIO-skole de fremgår af i lønfilen
-    med
-    hvilken SD-afdeling deres aktive XA-ansættelse tilhører
-    En ansættelse anses kun for aktiv, hvis Startdato ≤ dagsdato og Slutdato er NULL eller større end dagsdato.
+5. **Forkert TRIO-placering i forhold til SD-afdeling** <br>
+    Flere gange om dagen arkiveres lønfiler fra diverse skoler. Processen tjekker om de ansatte der fremgår af en skoles lønfil, er korrekt registreret. Den verificerer også at de ansatte i lønfilen eksisterer i MBU's systemer.
     Fejl registreres, hvis:
     - medarbejderen ikke har nogen aktiv XA-ansættelse
     - medarbejderen har flere aktive XA-ansættelser (datakvalitetsfejl)
@@ -50,8 +45,3 @@ Koden bliver kørt i [queue_framework](robot_framework/queue_framework.py) og f�
 - Hvert kø-element processeres i [process.py](/robot_framework/process.py), hvor notifikationen bliver afsendt. <br>
 
 De forskellige processer er struktureret under [kvailitetskontroller.py](/robot_framework/sql_scripts/kvalitetskontroller.py), hvor ét eller flere steps gennemgås for at samle de relevante items for processen.
-
-De forskellige notifikationsmuligheder er struktureret under [workers.py](/robot_framework/subprocesses/workers.py), og aktiveres som angivet i styretabellen.
-
-
-<img src="flow.png" alt="Flow Diagram" style="width:100%;">
