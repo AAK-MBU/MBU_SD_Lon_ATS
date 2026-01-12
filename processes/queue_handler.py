@@ -5,9 +5,6 @@ import json
 import logging
 import sys
 
-import os
-from pathlib import Path
-
 from datetime import datetime
 
 from automation_server_client import Workqueue
