@@ -23,18 +23,28 @@ logger = logging.getLogger(__name__)
 # ╔══════════════════════════════════════════════╗
 # ║ 🔥 REMOVE BEFORE DEPLOYMENT (TEMP OVERRIDES) 🔥 ║
 # ╚══════════════════════════════════════════════╝
-### This block handles the workqueue id selection ###
+## This block handles the workqueue id selection ###
 # import os
 # from dotenv import load_dotenv
 # load_dotenv()
+
+# os.environ["ATS_URL"] = os.environ["ATS_URL_DEV"]
+# os.environ["ATS_TOKEN"] = os.environ["ATS_TOKEN_DEV"]
+
 # if "--kv1" in sys.argv:
 #     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV1")
+
+# elif "--kv2" in sys.argv:
+#     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV2")
 
 # elif "--kv3" in sys.argv:
 #     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV3")
 
 # elif "--kv4" in sys.argv:
 #     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV4")
+
+# elif "--kv5" in sys.argv:
+#     os.environ["ATS_WORKQUEUE_OVERRIDE"] = os.getenv("ATS_WORKQUEUE_ID_KV5")
 
 # ### This block disables SSL verification ###
 # import requests

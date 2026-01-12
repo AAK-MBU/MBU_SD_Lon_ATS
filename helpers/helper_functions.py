@@ -130,6 +130,48 @@ def get_items_from_query(connection_string, query: str):
 
     return result
 
+
+def get_items_from_query_with_params(
+    connection_string,
+    query: str,
+    params: list | tuple
+):
+    """
+    Executes a parameterized SQL query and returns rows as list of dicts.
+    """
+
+    result = []
+
+    try:
+        with pyodbc.connect(connection_string) as conn:
+            with conn.cursor() as cursor:
+
+                cursor.execute(query, params)
+
+                rows = cursor.fetchall()
+
+                columns = [column[0] for column in cursor.description]
+
+                result = [
+                    {
+                        column: value.strip() if isinstance(value, str) else value
+                        for column, value in zip(columns, row)
+                    }
+                    for row in rows
+                ]
+
+    except pyodbc.Error as e:
+        logger.info(f"Database error: {str(e)}")
+        logger.info(f"{connection_string}")
+        raise
+
+    except Exception as e:
+        logger.info(f"Unexpected error: {str(e)}")
+        raise
+
+    return result or None
+
+
 def lis_enheder(connection_string: str, afdtype: tuple | None = None):
     """Get the right departments from LIS stamdata"""
 
@@ -208,3 +250,12 @@ def af_losid(connection_str: str):
     af_email_kobling = get_items_from_query(connection_string=connection_str, query=sql)
 
     return af_email_kobling
+
+
+def build_tillaeg_pairs_cte(pairs: list[dict]) -> str:
+    rows = []
+    for p in pairs:
+        ovk = p["ovk"]
+        a, b = p["pair"]
+        rows.append(f"({ovk}, {a}, {b})")
+    return ",\n".join(rows)
