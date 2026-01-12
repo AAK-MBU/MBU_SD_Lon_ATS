@@ -6,7 +6,7 @@ import logging
 
 from pathlib import Path
 
-from datetime import date
+from datetime import date, timedelta
 
 from collections import defaultdict
 
@@ -526,21 +526,24 @@ def kv5():
     """
     Runs the KV5 payroll placement validation.
 
-    The function reads SISPO payroll files, extracts all employee
-    occurrences, fetches the employee's active XA employment from SQL,
-    loads the TRIO→SD mapping rules, and validates whether each
-    employee appears in the correct TRIO school according to their
-    current SD department.  
-
-    The output is a list of mismatch records describing any detected
-    errors, such as missing active employments, invalid TRIO placement,
-    or multiple active employments for the same employee.
+    Reads SISPO payroll files, extracts employee occurrences, retrieves
+    active XA employments from SQL, loads TRIO→SD mapping rules, and
+    validates whether each employee appears in the correct TRIO school.
     """
 
     # --------------------------------------------------
-    # Configuration
+    # Configuration – Only process files from last full week
     # --------------------------------------------------
-    MIN_FOLDER_DATE = date(2025, 12, 1)
+    today = date.today()
+
+    # Monday of the current week (weekday(): Monday=0 ... Sunday=6)
+    current_week_monday = today - timedelta(days=today.weekday())
+
+    # Monday and Sunday of last week
+    last_week_monday = current_week_monday - timedelta(days=7)
+    last_week_sunday = last_week_monday + timedelta(days=6)
+
+    print(f"Processing SISPO folders from: {last_week_monday} → {last_week_sunday}")
 
     fields = {
         "Institutionskode": (0, 2),
@@ -568,6 +571,7 @@ def kv5():
             if not p.name.startswith("MBU_Trio_"):
                 continue
 
+            # Extract date from folder name
             date_part = p.name.split("_")[2]
             folder_date = date(
                 int(date_part[0:4]),
@@ -575,7 +579,8 @@ def kv5():
                 int(date_part[6:8]),
             )
 
-            if folder_date < MIN_FOLDER_DATE:
+            # Only process folders from LAST WEEK (Mon–Sun)
+            if not (last_week_monday <= folder_date <= last_week_sunday):
                 continue
 
             run_folders.append((folder_date, p))
