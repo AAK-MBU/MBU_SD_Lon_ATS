@@ -554,15 +554,7 @@ def kv5():
     connection_string_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRINGPROD"]
     connection_string_faelles = PROCESS_CONSTANTS["FaellesDbConnectionString"]
 
-    # root_folder = Path(
-    #     r"\\srvsql41\filsharedata2\Uddata\SDLOEN_Ud\Arkiv\MBU_Trio"
-    # )
-
     root_folder = Path(r"/data")
-
-    print(os.listdir("/data"))
-
-    sys.exit()
 
     # --------------------------------------------------
     # Phase 1: Read payroll files (NO SQL)
