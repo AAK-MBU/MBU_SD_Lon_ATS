@@ -1,5 +1,8 @@
 """Functions that defines errors to be handled by the robot"""
 
+import sys
+import os
+
 import logging
 
 from pathlib import Path
@@ -556,6 +559,10 @@ def kv5():
     # )
 
     root_folder = Path(r"/data")
+
+    print(os.listdir("/data"))
+
+    sys.exit()
 
     # --------------------------------------------------
     # Phase 1: Read payroll files (NO SQL)
