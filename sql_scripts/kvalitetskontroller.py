@@ -1,8 +1,5 @@
 """Functions that defines errors to be handled by the robot"""
 
-import sys
-import os
-
 import logging
 
 from pathlib import Path
