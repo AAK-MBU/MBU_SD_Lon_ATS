@@ -1,16 +1,13 @@
 """Functions that defines errors to be handled by the robot"""
 
 import logging
-
-from pathlib import Path
-
-from datetime import date, timedelta
-
 from collections import defaultdict
+from datetime import date, timedelta
+from pathlib import Path
 
 import pandas as pd
 
-from helpers import helper_functions
+from helpers import helper_functions, kv7_support_functions
 from helpers.process_constants import PROCESS_CONSTANTS
 
 logger = logging.getLogger(__name__)
@@ -187,9 +184,8 @@ def kv2(tillaegsnr_par: list):
     items_df["LOSID"] = items_df["LOSID"].astype(int, errors="ignore")
 
     lis_dep = helper_functions.lis_enheder(connection_string=connection_string_mbu)
-    lis_df = (
-        pd.DataFrame(lis_dep)
-        .rename(columns={"losid": "LOSID", "enhnavn": "Enhedsnavn"})
+    lis_df = pd.DataFrame(lis_dep).rename(
+        columns={"losid": "LOSID", "enhnavn": "Enhedsnavn"}
     )
     lis_df = lis_df[~lis_df["LOSID"].isna()].copy(deep=True)
     lis_df["LOSID"] = lis_df["LOSID"].astype(int, errors="ignore")
@@ -250,8 +246,7 @@ def kv3(
     dagtilbud_df = combined_df[
         (
             (combined_df["afdtype"].isin([2, 3, 4, 5, 11]))
-            &
-            (combined_df["SDafdID"].notna())
+            & (combined_df["SDafdID"].notna())
         )
     ]
     dagtilbud_afd = tuple(dagtilbud_df["SDafdID"].values)
@@ -351,7 +346,9 @@ def kv3_1(
 
     logger.info(f"printing the full sql:\n\n{sql}\n\n")
 
-    items = helper_functions.get_items_from_query(connection_string=connection_str, query=sql)
+    items = helper_functions.get_items_from_query(
+        connection_string=connection_str, query=sql
+    )
 
     return items
 
@@ -480,7 +477,9 @@ def kv3_dev_1(
             and Startdato <= GETDATE()
             and Slutdato > GETDATE()
     """
-    items = helper_functions.get_items_from_query(connection_string=connection_str, query=sql)
+    items = helper_functions.get_items_from_query(
+        connection_string=connection_str, query=sql
+    )
     return items
 
 
@@ -587,7 +586,6 @@ def kv5():
     run_folders.sort(key=lambda x: x[0], reverse=True)
 
     for folder_date, run_folder in run_folders:
-
         sispo_files = []
 
         for p in run_folder.iterdir():
@@ -600,7 +598,6 @@ def kv5():
         sispo_files.sort(key=lambda p: p.name, reverse=True)
 
         for file_path in sispo_files:
-
             print(f"Reading file: {run_folder.name} / {file_path.name}")
             print()
 
@@ -615,9 +612,7 @@ def kv5():
             trio_school_codes.add(trio_school_code)
 
             with file_path.open("r", encoding="utf-8", errors="replace") as file:
-
                 for line_no, raw_line in enumerate(file, start=1):
-
                     line = raw_line.rstrip("\n")
 
                     if not line.strip():
@@ -636,9 +631,7 @@ def kv5():
                     tjenestenumre.add(record["Tjenestenummer"])
 
                     validate_record(
-                        record=record,
-                        file_name=file_path.name,
-                        line_no=line_no
+                        record=record, file_name=file_path.name, line_no=line_no
                     )
 
                     records.append(record)
@@ -696,7 +689,7 @@ def kv5():
     employee_rows = helper_functions.get_items_from_query_with_params(
         connection_string=connection_string_faelles,
         query=employee_sql,
-        params=list(tjenestenumre)
+        params=list(tjenestenumre),
     )
 
     employees_by_tjenestenummer = {}
@@ -724,14 +717,16 @@ def kv5():
         if key in seen:
             continue
 
-        mismatches.append({
-            "Tjenestenummer": tjenestenummer,
-            "Overenskomst": row["Overenskomst"],
-            "Navn": row["Navn"],
-            "Institutionskode": row["Institutionskode"],
-            "Afdeling": row["Afdeling"],
-            "Error": "MULTIPLE_ACTIVE_EMPLOYMENTS"
-        })
+        mismatches.append(
+            {
+                "Tjenestenummer": tjenestenummer,
+                "Overenskomst": row["Overenskomst"],
+                "Navn": row["Navn"],
+                "Institutionskode": row["Institutionskode"],
+                "Afdeling": row["Afdeling"],
+                "Error": "MULTIPLE_ACTIVE_EMPLOYMENTS",
+            }
+        )
         seen.add(key)
 
     # --------------------------------------------------
@@ -752,7 +747,7 @@ def kv5():
     mapping_rows = helper_functions.get_items_from_query_with_params(
         connection_string=connection_string_mbu,
         query=mapping_sql,
-        params=list(trio_school_codes)
+        params=list(trio_school_codes),
     )
 
     trio_to_sd = defaultdict(set)
@@ -773,10 +768,7 @@ def kv5():
             key = (tjenestenummer, "NO_ACTIVE_XA_EMPLOYMENT")
 
             if key not in seen:
-                mismatches.append({
-                    **record,
-                    "Error": "NO_ACTIVE_XA_EMPLOYMENT"
-                })
+                mismatches.append({**record, "Error": "NO_ACTIVE_XA_EMPLOYMENT"})
                 seen.add(key)
 
             continue
@@ -788,14 +780,16 @@ def kv5():
             key = (tjenestenummer, trio_school_code, "SD_NOT_VALID_FOR_TRIO")
 
             if key not in seen:
-                mismatches.append({
-                    **record,
-                    "Afdeling": afdeling,
-                    "Allowed_sd": sorted(allowed_sd),
-                    "Navn": employee.get("Navn"),
-                    "Overenskomst": employee.get("Overenskomst"),
-                    "Error": "SD_NOT_VALID_FOR_TRIO"
-                })
+                mismatches.append(
+                    {
+                        **record,
+                        "Afdeling": afdeling,
+                        "Allowed_sd": sorted(allowed_sd),
+                        "Navn": employee.get("Navn"),
+                        "Overenskomst": employee.get("Overenskomst"),
+                        "Error": "SD_NOT_VALID_FOR_TRIO",
+                    }
+                )
                 seen.add(key)
 
     # --------------------------------------------------
@@ -825,3 +819,170 @@ def validate_record(record: dict, file_name: str, line_no: int):
         raise ValueError(
             f"{file_name} | line {line_no}: key2 must be 7-digit number, got '{record['Tjenestenummer']}'"
         )
+
+
+def compare_wages_month_prior(tjenestenumre: tuple):
+    """
+    Sums up tillægs beløb and trin as well as grundtrin from current month and prior month
+    """
+
+    sql_query = f"""    
+        WITH unified_now AS (
+            -- Tillæg rows active now
+            SELECT
+                til.Tjenestenummer,
+                til.AnsættelsesID,
+                CASE WHEN til.Beløb <> 0 THEN til.Beløb END AS Beløb,
+                CASE WHEN til.Beløb = 0  THEN til.Trin  END AS Trin
+            FROM [Personale].[sd_magistrat].[tillæg_mbu] AS til
+            WHERE til.Startdato <= DATEADD(MONTH, 0, GETDATE())
+            AND til.Slutdato  >  DATEADD(MONTH, 0, GETDATE())
+            AND til.Institutionskode = 'XA'
+
+            UNION ALL
+
+            -- Ansættelse rows active now
+            SELECT
+                ans.Tjenestenummer,
+                ans.AnsættelsesID,
+                NULL AS Beløb,
+                ans.Trin AS Trin
+            FROM [Personale].[sd_magistrat].[Ansættelse_mbu] AS ans
+            WHERE ans.Startdato <= DATEADD(MONTH, 0, GETDATE())
+            AND ans.Slutdato  >  DATEADD(MONTH, 0, GETDATE())
+            AND ans.Statuskode IN ('1','3','5')
+            AND ans.Institutionskode = 'XA'
+        ),
+        agg_now AS (
+            SELECT
+                Tjenestenummer,
+                AnsættelsesID,
+                COALESCE(SUM(Beløb), 0) AS Sum_Beløb,
+                COALESCE(SUM(Trin), 0)  AS Sum_Trin
+            FROM unified_now
+            GROUP BY Tjenestenummer, AnsættelsesID
+        ),
+
+        unified_prev AS (
+            -- Tillæg rows active one month back
+            SELECT
+                til.Tjenestenummer,
+                til.AnsættelsesID,
+                CASE WHEN til.Beløb <> 0 THEN til.Beløb END AS Beløb,
+                CASE WHEN til.Beløb = 0  THEN til.Trin  END AS Trin
+            FROM [Personale].[sd_magistrat].[tillæg_mbu] AS til
+            WHERE til.Startdato <= DATEADD(MONTH, -1, GETDATE())
+            AND til.Slutdato  >  DATEADD(MONTH, -1, GETDATE())
+            AND til.Institutionskode = 'XA'
+
+            UNION ALL
+
+            -- Ansættelse rows active one month back
+            SELECT
+                ans.Tjenestenummer,
+                ans.AnsættelsesID,
+                NULL AS Beløb,
+                ans.Trin AS Trin
+            FROM [Personale].[sd_magistrat].[Ansættelse_mbu] AS ans
+            WHERE ans.Startdato <= DATEADD(MONTH, -1, GETDATE())
+            AND ans.Slutdato  >  DATEADD(MONTH, -1, GETDATE())
+            AND ans.Statuskode IN ('1','3','5')
+            AND ans.Institutionskode = 'XA'
+        ),
+        agg_prev AS (
+            SELECT
+                Tjenestenummer,
+                AnsættelsesID,
+                COALESCE(SUM(Beløb), 0) AS Sum_Beløb_Prev,
+                COALESCE(SUM(Trin), 0)  AS Sum_Trin_Prev
+            FROM unified_prev
+            GROUP BY Tjenestenummer, AnsættelsesID
+        )
+
+        SELECT
+            COALESCE(n.Tjenestenummer, p.Tjenestenummer)  AS Tjenestenummer,
+            COALESCE(n.AnsættelsesID, p.AnsættelsesID)    AS AnsættelsesID,
+
+            n.Sum_Beløb,
+            p.Sum_Beløb_Prev,
+            n.Sum_Trin,
+            p.Sum_Trin_Prev,
+            CAST(ISNULL(n.Sum_Beløb, 0) - ISNULL(p.Sum_Beløb_Prev, 0) AS decimal(18, 2)) AS Delta_Beløb,
+            ISNULL(n.Sum_Trin, 0) - ISNULL(p.Sum_Trin_Prev, 0) AS Delta_Trin
+        FROM agg_now AS n
+        FULL OUTER JOIN agg_prev AS p
+        ON  p.Tjenestenummer = n.Tjenestenummer
+        AND p.AnsættelsesID  = n.AnsættelsesID
+        WHERE p.Tjenestenummer in {tjenestenumre}
+    """
+
+    connection_string = PROCESS_CONSTANTS["FaellesDbConnectionString"]
+
+    rows = helper_functions.get_items_from_query(
+        connection_string=connection_string, query=sql_query
+    )
+
+    return rows
+
+
+def kv6(tjenestenumre: tuple):
+    """
+    Get monthly wages for current and previous month for a group of employees, and check that wages haven't changed.
+    """
+    wage_data = compare_wages_month_prior(tjenestenumre)
+
+    wage_df = pd.DataFrame(wage_data)
+
+    wage_df = wage_df.rename(
+        columns={
+            "Sum_Beløb": "sum_tillægsbeløb_nu",
+            "Sum_Beløb_Prev": "sum_tillægsbeløb_forrige",
+            "Sum_Trin": "sum_trin_nu",
+            "Sum_Trin_Prev": "sum_trin_forrige",
+            "Delta_Beløb": "ændringer_beløb",
+            "Delta_Trin": "ændringer_trin",
+        }
+    )
+
+    items_df = wage_df[
+        ((wage_df["ændringer_beløb"] != 0) | (wage_df["ændringer_trin"] != 0))
+    ]
+
+    items = helper_functions.item_df_to_item_list(item_df=items_df)
+
+    return items
+
+
+def kv7(exclude_schoolname: list, exclude_dagtilbudname: list):
+    """
+    Function to check that employees have necesarry tillæg
+    """
+
+    conn_str_faellesdb = PROCESS_CONSTANTS["FaellesDbConnectionString"]
+    conn_str_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRINGPROD"]
+    # Get employees
+    employees_df = kv7_support_functions.get_employees(conn_str_faellesdb)
+
+    # Select almen
+    almen_employees_df = kv7_support_functions.select_employees_almen(
+        conn_str_mbu,
+        conn_str_faellesdb,
+        exclude_schoolname,
+        exclude_dagtilbudname,
+        employees_df,
+    )
+
+    # Select only school employees for now
+    almen_employees_df = almen_employees_df[almen_employees_df["Enhedstype"] == "Skole"]
+
+    # Get mapping of tillæg and lønklasser
+    minimumstillaeg_df = kv7_support_functions.get_minimumstillaeg(conn_str_mbu)
+
+    # Compare
+    employee_missing_tillaeg = kv7_support_functions.check_employee_tillaeg(
+        employee_df=almen_employees_df, minimumstillaeg_df=minimumstillaeg_df
+    )
+
+    items = helper_functions.item_df_to_item_list(employee_missing_tillaeg)
+
+    return items

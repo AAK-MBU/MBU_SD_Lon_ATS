@@ -3,12 +3,10 @@ Helper functions used accross process
 """
 
 import logging
-
-from datetime import date
-
-import pyodbc
+from datetime import date, datetime
 
 import pandas as pd
+import pyodbc
 
 from helpers.process_constants import PROCESS_CONSTANTS
 
@@ -33,7 +31,13 @@ def combine_with_af_email(item_df: pd.DataFrame):
 
     combined_df = pd.merge(left=combined_df, right=lis_dep_df, on="LOSID")
 
-    items = list(combined_df.T.to_dict().values())
+    items = item_df_to_item_list(item_df=combined_df)
+
+    return items
+
+
+def item_df_to_item_list(item_df: pd.DataFrame) -> list:
+    items = list(item_df.T.to_dict().values())
 
     return items
 
@@ -71,10 +75,15 @@ def find_pair_info(data: dict, number: int):
         tuple: (other_value, corresponding_name) if found, else None
     """
 
-    pair = data.get('pair')
-    pair_names = data.get('pair_names')
+    pair = data.get("pair")
+    pair_names = data.get("pair_names")
 
-    if isinstance(pair, tuple) and isinstance(pair_names, tuple) and len(pair) == 2 and len(pair_names) == 2:
+    if (
+        isinstance(pair, tuple)
+        and isinstance(pair_names, tuple)
+        and len(pair) == 2
+        and len(pair_names) == 2
+    ):
         if number in pair:
             index = pair.index(number)
             other_index = 1 - index
@@ -91,7 +100,6 @@ def get_items_from_query(connection_string, query: str):
     try:
         with pyodbc.connect(connection_string) as conn:
             with conn.cursor() as cursor:
-
                 cursor.execute(query)
 
                 rows = cursor.fetchall()
@@ -132,9 +140,7 @@ def get_items_from_query(connection_string, query: str):
 
 
 def get_items_from_query_with_params(
-    connection_string,
-    query: str,
-    params: list | tuple
+    connection_string, query: str, params: list | tuple
 ):
     """
     Executes a parameterized SQL query and returns rows as list of dicts.
@@ -145,7 +151,6 @@ def get_items_from_query_with_params(
     try:
         with pyodbc.connect(connection_string) as conn:
             with conn.cursor() as cursor:
-
                 cursor.execute(query, params)
 
                 rows = cursor.fetchall()
@@ -187,12 +192,10 @@ def lis_enheder(connection_string: str, afdtype: tuple | None = None):
     """
 
     if afdtype:
-        sql += (
-            f"""
+        sql += f"""
                 WHERE
                     afdtype IN {afdtype}
             """
-        )
 
     departments = get_items_from_query(connection_string=connection_string, query=sql)
 
@@ -211,12 +214,10 @@ def sd_enheder(connection_string: str, losid_tuple: tuple | None = None):
     """
 
     if losid_tuple:
-        sql += (
-            f"""
+        sql += f"""
                 WHERE
                     LOSID IN {losid_tuple}
             """
-        )
 
     departments = get_items_from_query(connection_string=connection_string, query=sql)
 
@@ -259,3 +260,58 @@ def build_tillaeg_pairs_cte(pairs: list[dict]) -> str:
         a, b = p["pair"]
         rows.append(f"({ovk}, {a}, {b})")
     return ",\n".join(rows)
+
+
+def dk_month_relative(offset: int = 0) -> str:
+    """Return Danish short month + last two digits of year based on relative offset.
+
+    Example outputs:
+        "feb 26", "dec 25".
+    """
+    # Danish short month names
+    dk_months = [
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "maj",
+        "jun",
+        "jul",
+        "aug",
+        "sep",
+        "okt",
+        "nov",
+        "dec",
+    ]
+
+    # Current date
+    today = datetime.today()
+
+    # Compute target year and month
+    year = today.year + ((today.month - 1 + offset) // 12)
+    month = (today.month - 1 + offset) % 12 + 1
+
+    # Convert to Danish month name and 2‑digit year
+    month_name = dk_months[month - 1]
+    year_two_digits = str(year)[-2:]
+
+    return f"{month_name} {year_two_digits}"
+
+
+def get_tillaeg_navn(conn_str_faelles: str, tillaeg: int | str):
+    sql = f"""
+        SELECT
+	        Tillægsnummer, Tillægsnavn
+        FROM Personale.sd_magistrat.tillæg_mbu
+        WHERE 
+            Tillægsnummer = {tillaeg} 
+            and Startdato <= getdate() and Slutdato > getdate()
+        GROUP BY Tillægsnummer, Tillægsnavn
+    """
+    tillaeg_navn = get_items_from_query(conn_str_faelles, sql)
+
+    assert len(tillaeg_navn) == 1, (
+        f"The tillaegsnummer returned {len(tillaeg_navn)} different names associated with the nummer"
+    )
+
+    return tillaeg_navn[0]

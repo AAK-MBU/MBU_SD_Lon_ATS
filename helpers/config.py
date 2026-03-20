@@ -1,8 +1,7 @@
 """Module for general configurations of the process"""
 
-from helpers.tillaeg_pairs import tillaeg_pairs
-
 from helpers import email_handler
+from helpers.tillaeg_pairs import tillaeg_pairs
 from sql_scripts import kvalitetskontroller
 
 MAX_RETRY = 10
@@ -90,6 +89,14 @@ PROCESS_PROCEDURE_DICT = {
     "KV5": {
         "procedure": kvalitetskontroller.kv5,
         "parameters": {},
+    },
+    "KV6": {
+        "procedure": kvalitetskontroller.kv6,
+        "parameters": {},
+    },
+    "KV7": {
+        "procedure": kvalitetskontroller.kv7,
+        "parameters": {"exclude_schoolname": ["Stensagerskolen", "Langagerskolen"]},
     },
 }
 

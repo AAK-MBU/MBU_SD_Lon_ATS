@@ -1,16 +1,13 @@
 """Module to contain different workers"""
 
+import json
 import logging
-
 import re
 
 from helpers import smtp_util
-from helpers.helper_functions import (
-    find_pair_info,
-    # find_match_ovk
-)
-from helpers.tillaeg_pairs import tillaeg_pairs
+from helpers.helper_functions import dk_month_relative, find_pair_info, get_tillaeg_navn
 from helpers.process_constants import PROCESS_CONSTANTS
+from helpers.tillaeg_pairs import tillaeg_pairs
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +20,7 @@ def handle_email(data: dict, process_type: str, notification_receiver: str):
     sender = PROCESS_CONSTANTS["e-mail_noreply"]
 
     email_subject, email_body = construct_worker_text(
-        process_type=process_type,
-        data=data
+        process_type=process_type, data=data
     )
 
     smtp_util.send_email(
@@ -112,7 +108,6 @@ def construct_worker_text(process_type: str, data: dict):
 
     # Forkert overenskomst skole/dagtilbud
     elif process_type in ("KV3", "KV3-DEV"):
-
         afdtype_txt = data["afdtype_txt"]
         # exp_ovk = find_match_ovk(overenskomst)
 
@@ -154,7 +149,6 @@ def construct_worker_text(process_type: str, data: dict):
         file_name = data.get("File_name")
         trio_school_code = data.get("Trio_school_code")
 
-
         if error == "NO_ACTIVE_XA_EMPLOYMENT":
             subject = "Ikke eksisterende medarbejder fundet i lønudtræk"
 
@@ -185,5 +179,116 @@ def construct_worker_text(process_type: str, data: dict):
                 + f"<p>Følgende SD afdelingskoder er tilkoblet skolekode {trio_school_code}:</p>"
                 + f"<p>{allowed_sd}:</p>"
             )
+
+    elif process_type == "KV6":
+        prev_beloeb = data.get("sum_tillægsbeløb_forrige", None)
+        curr_beloeb = data.get("sum_tillægsbeløb_nu", None)
+        change_beloeb = data.get("ændringer_beløb", None)
+        prev_trin = data.get("sum_trin_forrige", None)
+        curr_trin = data.get("sum_trin_nu", None)
+        change_trin = data.get("ændringer_trin", None)
+
+        curr_month_txt = f"({dk_month_relative(offset=0)})"
+        prev_month_txt = f"({dk_month_relative(offset=-1)})"
+
+        subject = "Ændring på lønsammensætning for medarbejder på gammel fleksordning"
+
+        change_beloeb_txt = (
+            "<p><i>Alle beløb er i 31/3-00 niveau</i></p>"
+            + f"<p>Tidligere tillægsbeløb {prev_month_txt}: {prev_beloeb:,.2f}</p>".replace(
+                ".", ";"
+            )
+            .replace(",", ".")
+            .replace(";", ",")
+            + f"<p>Nuværende tillægsbeløb {curr_month_txt}: {curr_beloeb:,.2f}</p>".replace(
+                ".", ";"
+            )
+            .replace(",", ".")
+            .replace(";", ",")
+            + f"<p>Ændring i tillægsbeløb: {change_beloeb:,.2f}</p>".replace(".", ";")
+            .replace(",", ".")
+            .replace(";", ",")
+            + "-" * 50
+        )
+
+        change_trin_txt = (
+            f"<p>Tidligere løntrin {prev_month_txt}: {prev_trin}</p>"
+            + f"<p>Nuværende løntrin {curr_month_txt}: {curr_trin}</p>"
+            + f"<p>Ændring i løntrin: {change_trin}</p>"
+            + "-" * 50
+        )
+
+        text = (
+            "<h4>Følgende medarbejder er ansat på gammel fleksordning og har fået en ændring i sin lønsammensætning</h4>"
+            + f"<p>Tjenestenummer: {person_id}</p>"
+            + "-" * 50
+            + (f"{change_beloeb_txt}" if change_beloeb and change_beloeb != 0 else "")
+            + (f"{change_trin_txt}" if change_trin and change_trin != 0 else "")
+        )
+
+    elif process_type == "KV7":
+        current_tillaeg = data.get("available_tillaeg", None)
+        required_tillaeg = data.get("required_tillaeg", None)
+        missing_tillaeg = data.get("missing_tillaeg", None)
+        loenklasse = data.get("Loenklasse", None)
+        stilling = data.get("Stilling", None)
+        enhedsnavn = data.get("enhnavn", None)
+        current_tillaeg_dict = data.get("Tillaeg_List")
+        subject = "Medarbejder mangler påkrævet tillæg fra skabelonansættelse"
+
+        conn_str_faelles = PROCESS_CONSTANTS["FaellesDbConnectionString"]
+
+        current_tillaeg_dict = json.loads(current_tillaeg_dict)
+        current_tillaeg_dict = {
+            item["Tillægsnummer"]: item["Tillægsnavn"]
+            for item in current_tillaeg_dict
+            if isinstance(item, dict)
+            and "Tillægsnummer" in item
+            and "Tillægsnavn" in item
+        }
+
+        missing_tillaeg_text = (
+            "<ul>"
+            + "".join(
+                f"<li>{item} ({get_tillaeg_navn(conn_str_faelles, item)['Tillægsnavn']})</li>"
+                for item in missing_tillaeg
+            )
+            + "</ul>"
+        )
+
+        current_tillaeg_text = (
+            "<ul>"
+            + "".join(
+                f"<li>{item} ({current_tillaeg_dict[str(item)]})</li>"
+                for item in current_tillaeg
+            )
+            + "</ul>"
+        )
+
+        required_tillaeg_text = (
+            "<ul>"
+            + "".join(
+                f"<li>{item} ({get_tillaeg_navn(conn_str_faelles, item)['Tillægsnavn']})</li>"
+                for item in required_tillaeg
+            )
+            + "</ul>"
+        )
+
+        text = (
+            "<h4>Følgende medarbejder mangler et påkrævet tillæg</h4>"
+            + f"<p>Tjenestenummer: {person_id}</p>"
+            + f"<p>Stilling: {stilling}</p>"
+            + f"<p>SD institutionskode: {sd_inst_kode}</p>"
+            + f"<p>Enhed: {enhedsnavn}</p>"
+            + f"<p>Lønklasse: {loenklasse}</p>"
+            + "-" * 50
+            + "<p>Manglende tillæg:</p>"
+            + missing_tillaeg_text
+            + "-" * 50
+            + "<p>Medarbejderen har følgende tillæg:</p>"
+            + current_tillaeg_text
+            + "<p>Medarbejderens lønklasse, enhed, institutionskode og stilling kræver følgende tillæg:</p>"
+            + required_tillaeg_text
+        )
 
     return subject, text
