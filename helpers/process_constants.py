@@ -2,9 +2,9 @@
 Module to contain and lazy-load constants
 """
 
+import json
 import os
 import sys
-import json
 
 from mbu_dev_shared_components.database.connection import RPAConnection
 
@@ -32,10 +32,15 @@ def _load_constants():
             value = conn.get_constant(key).get("value", "{}")
             _cached_constants["kv_proc_args"] = json.loads(value)
 
-        _cached_constants["e-mail_noreply"] = conn.get_constant("e-mail_noreply").get("value", "")
+        _cached_constants["e-mail_noreply"] = conn.get_constant("e-mail_noreply").get(
+            "value", ""
+        )
 
-        _cached_constants["smtp_server"] = conn.get_constant("smtp_adm_server").get("value", "")
+        _cached_constants["smtp_server"] = conn.get_constant("smtp_adm_server").get(
+            "value", ""
+        )
         _cached_constants["smtp_port"] = conn.get_constant("smtp_port").get("value", "")
+
 
 class Constants(dict):
     """

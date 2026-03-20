@@ -1,12 +1,13 @@
 """Module to contain different workers"""
 
+import json
 import logging
-
 import re
 
 from helpers import smtp_util
 from helpers.helper_functions import dk_month_relative, find_pair_info, get_tillaeg_navn
 from helpers.process_constants import PROCESS_CONSTANTS
+from helpers.tillaeg_pairs import tillaeg_pairs
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,7 @@ def handle_email(data: dict, process_type: str, notification_receiver: str):
     sender = PROCESS_CONSTANTS["e-mail_noreply"]
 
     email_subject, email_body = construct_worker_text(
-        process_type=process_type,
-        data=data
+        process_type=process_type, data=data
     )
 
     smtp_util.send_email(
@@ -108,7 +108,6 @@ def construct_worker_text(process_type: str, data: dict):
 
     # Forkert overenskomst skole/dagtilbud
     elif process_type in ("KV3", "KV3-DEV"):
-
         afdtype_txt = data["afdtype_txt"]
         # exp_ovk = find_match_ovk(overenskomst)
 
@@ -149,7 +148,6 @@ def construct_worker_text(process_type: str, data: dict):
         Folder_date = data.get("Folder_date")
         file_name = data.get("File_name")
         trio_school_code = data.get("Trio_school_code")
-
 
         if error == "NO_ACTIVE_XA_EMPLOYMENT":
             subject = "Ikke eksisterende medarbejder fundet i lønudtræk"
