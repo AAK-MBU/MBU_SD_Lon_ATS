@@ -259,3 +259,58 @@ def build_tillaeg_pairs_cte(pairs: list[dict]) -> str:
         a, b = p["pair"]
         rows.append(f"({ovk}, {a}, {b})")
     return ",\n".join(rows)
+
+
+def dk_month_relative(offset: int = 0) -> str:
+    """Return Danish short month + last two digits of year based on relative offset.
+
+    Example outputs:
+        "feb 26", "dec 25".
+    """
+    # Danish short month names
+    dk_months = [
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "maj",
+        "jun",
+        "jul",
+        "aug",
+        "sep",
+        "okt",
+        "nov",
+        "dec",
+    ]
+
+    # Current date
+    today = datetime.today()
+
+    # Compute target year and month
+    year = today.year + ((today.month - 1 + offset) // 12)
+    month = (today.month - 1 + offset) % 12 + 1
+
+    # Convert to Danish month name and 2‑digit year
+    month_name = dk_months[month - 1]
+    year_two_digits = str(year)[-2:]
+
+    return f"{month_name} {year_two_digits}"
+
+
+def get_tillaeg_navn(conn_str_faelles: str, tillaeg: int | str):
+    sql = f"""
+        SELECT
+	        Tillægsnummer, Tillægsnavn
+        FROM Personale.sd_magistrat.tillæg_mbu
+        WHERE 
+            Tillægsnummer = {tillaeg} 
+            and Startdato <= getdate() and Slutdato > getdate()
+        GROUP BY Tillægsnummer, Tillægsnavn
+    """
+    tillaeg_navn = get_items_from_query(conn_str_faelles, sql)
+
+    assert len(tillaeg_navn) == 1, (
+        f"The tillaegsnummer returned {len(tillaeg_navn)} different names associated with the nummer"
+    )
+
+    return tillaeg_navn[0]

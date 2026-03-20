@@ -91,6 +91,14 @@ PROCESS_PROCEDURE_DICT = {
         "procedure": kvalitetskontroller.kv5,
         "parameters": {},
     },
+    "KV6": {
+        "procedure": kvalitetskontroller.kv6,
+        "parameters": {},
+    },
+    "KV7": {
+        "procedure": kvalitetskontroller.kv7,
+        "parameters": {"exclude_schoolname": ["Stensagerskolen", "Langagerskolen"]},
+    },
 }
 
 

@@ -825,3 +825,170 @@ def validate_record(record: dict, file_name: str, line_no: int):
         raise ValueError(
             f"{file_name} | line {line_no}: key2 must be 7-digit number, got '{record['Tjenestenummer']}'"
         )
+
+
+def compare_wages_month_prior(tjenestenumre: tuple):
+    """
+    Sums up tillægs beløb and trin as well as grundtrin from current month and prior month
+    """
+
+    sql_query = f"""    
+        WITH unified_now AS (
+            -- Tillæg rows active now
+            SELECT
+                til.Tjenestenummer,
+                til.AnsættelsesID,
+                CASE WHEN til.Beløb <> 0 THEN til.Beløb END AS Beløb,
+                CASE WHEN til.Beløb = 0  THEN til.Trin  END AS Trin
+            FROM [Personale].[sd_magistrat].[tillæg_mbu] AS til
+            WHERE til.Startdato <= DATEADD(MONTH, 0, GETDATE())
+            AND til.Slutdato  >  DATEADD(MONTH, 0, GETDATE())
+            AND til.Institutionskode = 'XA'
+
+            UNION ALL
+
+            -- Ansættelse rows active now
+            SELECT
+                ans.Tjenestenummer,
+                ans.AnsættelsesID,
+                NULL AS Beløb,
+                ans.Trin AS Trin
+            FROM [Personale].[sd_magistrat].[Ansættelse_mbu] AS ans
+            WHERE ans.Startdato <= DATEADD(MONTH, 0, GETDATE())
+            AND ans.Slutdato  >  DATEADD(MONTH, 0, GETDATE())
+            AND ans.Statuskode IN ('1','3','5')
+            AND ans.Institutionskode = 'XA'
+        ),
+        agg_now AS (
+            SELECT
+                Tjenestenummer,
+                AnsættelsesID,
+                COALESCE(SUM(Beløb), 0) AS Sum_Beløb,
+                COALESCE(SUM(Trin), 0)  AS Sum_Trin
+            FROM unified_now
+            GROUP BY Tjenestenummer, AnsættelsesID
+        ),
+
+        unified_prev AS (
+            -- Tillæg rows active one month back
+            SELECT
+                til.Tjenestenummer,
+                til.AnsættelsesID,
+                CASE WHEN til.Beløb <> 0 THEN til.Beløb END AS Beløb,
+                CASE WHEN til.Beløb = 0  THEN til.Trin  END AS Trin
+            FROM [Personale].[sd_magistrat].[tillæg_mbu] AS til
+            WHERE til.Startdato <= DATEADD(MONTH, -1, GETDATE())
+            AND til.Slutdato  >  DATEADD(MONTH, -1, GETDATE())
+            AND til.Institutionskode = 'XA'
+
+            UNION ALL
+
+            -- Ansættelse rows active one month back
+            SELECT
+                ans.Tjenestenummer,
+                ans.AnsættelsesID,
+                NULL AS Beløb,
+                ans.Trin AS Trin
+            FROM [Personale].[sd_magistrat].[Ansættelse_mbu] AS ans
+            WHERE ans.Startdato <= DATEADD(MONTH, -1, GETDATE())
+            AND ans.Slutdato  >  DATEADD(MONTH, -1, GETDATE())
+            AND ans.Statuskode IN ('1','3','5')
+            AND ans.Institutionskode = 'XA'
+        ),
+        agg_prev AS (
+            SELECT
+                Tjenestenummer,
+                AnsættelsesID,
+                COALESCE(SUM(Beløb), 0) AS Sum_Beløb_Prev,
+                COALESCE(SUM(Trin), 0)  AS Sum_Trin_Prev
+            FROM unified_prev
+            GROUP BY Tjenestenummer, AnsættelsesID
+        )
+
+        SELECT
+            COALESCE(n.Tjenestenummer, p.Tjenestenummer)  AS Tjenestenummer,
+            COALESCE(n.AnsættelsesID, p.AnsættelsesID)    AS AnsættelsesID,
+
+            n.Sum_Beløb,
+            p.Sum_Beløb_Prev,
+            n.Sum_Trin,
+            p.Sum_Trin_Prev,
+            CAST(ISNULL(n.Sum_Beløb, 0) - ISNULL(p.Sum_Beløb_Prev, 0) AS decimal(18, 2)) AS Delta_Beløb,
+            ISNULL(n.Sum_Trin, 0) - ISNULL(p.Sum_Trin_Prev, 0) AS Delta_Trin
+        FROM agg_now AS n
+        FULL OUTER JOIN agg_prev AS p
+        ON  p.Tjenestenummer = n.Tjenestenummer
+        AND p.AnsættelsesID  = n.AnsættelsesID
+        WHERE p.Tjenestenummer in {tjenestenumre}
+    """
+
+    connection_string = PROCESS_CONSTANTS["FaellesDbConnectionString"]
+
+    rows = helper_functions.get_items_from_query(
+        connection_string=connection_string, query=sql_query
+    )
+
+    return rows
+
+
+def kv6(tjenestenumre: tuple):
+    """
+    Get monthly wages for current and previous month for a group of employees, and check that wages haven't changed.
+    """
+    wage_data = compare_wages_month_prior(tjenestenumre)
+
+    wage_df = pd.DataFrame(wage_data)
+
+    wage_df = wage_df.rename(
+        columns={
+            "Sum_Beløb": "sum_tillægsbeløb_nu",
+            "Sum_Beløb_Prev": "sum_tillægsbeløb_forrige",
+            "Sum_Trin": "sum_trin_nu",
+            "Sum_Trin_Prev": "sum_trin_forrige",
+            "Delta_Beløb": "ændringer_beløb",
+            "Delta_Trin": "ændringer_trin",
+        }
+    )
+
+    items_df = wage_df[
+        ((wage_df["ændringer_beløb"] != 0) | (wage_df["ændringer_trin"] != 0))
+    ]
+
+    items = helper_functions.item_df_to_item_list(item_df=items_df)
+
+    return items
+
+
+def kv7(exclude_schoolname: list, exclude_dagtilbudname: list):
+    """
+    Function to check that employees have necesarry tillæg
+    """
+
+    conn_str_faellesdb = PROCESS_CONSTANTS["FaellesDbConnectionString"]
+    conn_str_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRINGPROD"]
+    # Get employees
+    employees_df = kv7_support_functions.get_employees(conn_str_faellesdb)
+
+    # Select almen
+    almen_employees_df = kv7_support_functions.select_employees_almen(
+        conn_str_mbu,
+        conn_str_faellesdb,
+        exclude_schoolname,
+        exclude_dagtilbudname,
+        employees_df,
+    )
+
+    # Select only school employees for now
+    almen_employees_df = almen_employees_df[almen_employees_df["Enhedstype"] == "Skole"]
+
+    # Get mapping of tillæg and lønklasser
+    minimumstillaeg_df = kv7_support_functions.get_minimumstillaeg(conn_str_mbu)
+
+    # Compare
+    employee_missing_tillaeg = kv7_support_functions.check_employee_tillaeg(
+        employee_df=almen_employees_df, minimumstillaeg_df=minimumstillaeg_df
+    )
+
+    items = helper_functions.item_df_to_item_list(employee_missing_tillaeg)
+
+    return items
