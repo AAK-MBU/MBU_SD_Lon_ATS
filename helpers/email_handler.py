@@ -187,11 +187,12 @@ def construct_worker_text(process_type: str, data: dict):
         prev_trin = data.get("sum_trin_forrige", None)
         curr_trin = data.get("sum_trin_nu", None)
         change_trin = data.get("ændringer_trin", None)
+        per_gruppe = data.get("Personale_gruppe", None)
 
         curr_month_txt = f"({dk_month_relative(offset=0)})"
         prev_month_txt = f"({dk_month_relative(offset=-1)})"
 
-        subject = "Ændring på lønsammensætning for medarbejder på gammel fleksordning"
+        subject = f"Ændring på lønsammensætning for medarbejder på gammel fleksordning - {per_gruppe}"
 
         change_beloeb_txt = (
             "<p><i>Alle beløb er i 31/3-00 niveau</i></p>"
@@ -219,7 +220,7 @@ def construct_worker_text(process_type: str, data: dict):
         )
 
         text = (
-            "<h4>Følgende medarbejder er ansat på gammel fleksordning og har fået en ændring i sin lønsammensætning</h4>"
+            f"<h4>Følgende medarbejder er ansat på gammel fleksordning i {per_gruppe} og har fået en ændring i sin lønsammensætning</h4>"
             + f"<p>Tjenestenummer: {person_id}</p>"
             + "-" * 50
             + (f"{change_beloeb_txt}" if change_beloeb and change_beloeb != 0 else "")
