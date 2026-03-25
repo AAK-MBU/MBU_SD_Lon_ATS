@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from helpers import helper_functions, kv7_support_functions
+from helpers import helper_functions, kv6_support_functions, kv7_support_functions
 from helpers.process_constants import PROCESS_CONSTANTS
 
 logger = logging.getLogger(__name__)
@@ -925,11 +925,18 @@ def compare_wages_month_prior(tjenestenumre: tuple):
     return rows
 
 
-def kv6(tjenestenumre: tuple):
+def kv6():
     """
     Get monthly wages for current and previous month for a group of employees, and check that wages haven't changed.
     """
-    wage_data = compare_wages_month_prior(tjenestenumre)
+
+    conn_str_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRINGPROD"]
+
+    tjenestenumre_df = kv6_support_functions.get_tjenestenumre(conn_str_mbu)
+
+    tjenestenumre = tuple(tjenestenumre_df["Tjenestenummer"].values)
+
+    wage_data = compare_wages_month_prior(tjenestenumre=tjenestenumre)
 
     wage_df = pd.DataFrame(wage_data)
 
@@ -947,6 +954,12 @@ def kv6(tjenestenumre: tuple):
     items_df = wage_df[
         ((wage_df["ændringer_beløb"] != 0) | (wage_df["ændringer_trin"] != 0))
     ]
+
+    items_df = items_df.merge(
+        tjenestenumre_df[["Tjenestenummer", "Personale_gruppe", "Ansaettelsestype"]],
+        on="Tjenestenummer",
+        how="left",
+    )
 
     items = helper_functions.item_df_to_item_list(item_df=items_df)
 
