@@ -4,6 +4,7 @@ Helper functions used accross process
 
 import logging
 from datetime import date, datetime
+from decimal import Decimal
 
 import pandas as pd
 import pyodbc
@@ -42,13 +43,18 @@ def item_df_to_item_list(item_df: pd.DataFrame) -> list:
     return items
 
 
+def value_formatter(value):
+    if isinstance(value, date):
+        value = value.strftime("%d-%m-%Y")
+    elif isinstance(value, Decimal):
+        value = int(value)
+    return value
+
+
 def format_item(item: dict):
     """Format dates in dict, e.g. for json parsing"""
 
-    return {
-        key: value.strftime("%d-%m-%Y") if isinstance(value, date) else value
-        for key, value in item.items()
-    }
+    return {key: value_formatter(value) for key, value in item.items()}
 
 
 # def find_match_ovk(ovk: str):
