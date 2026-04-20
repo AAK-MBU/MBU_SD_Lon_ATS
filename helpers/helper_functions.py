@@ -48,6 +48,8 @@ def value_formatter(value):
         value = value.strftime("%d-%m-%Y")
     elif isinstance(value, Decimal):
         value = int(value)
+    elif isinstance(value, set):
+        value = list(value)
     return value
 
 
