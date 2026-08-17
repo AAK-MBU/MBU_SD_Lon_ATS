@@ -551,6 +551,10 @@ def kv5():
     connection_string_faelles = PROCESS_CONSTANTS["FaellesDbConnectionString"]
 
     root_folder = Path(r"/data")
+    import os
+
+    logger.info(f"{os.path.exists(root_folder) = }")
+    logger.info(f"{os.listdir(root_folder) = }")
 
     # --------------------------------------------------
     # Phase 1: Read payroll files (NO SQL)
