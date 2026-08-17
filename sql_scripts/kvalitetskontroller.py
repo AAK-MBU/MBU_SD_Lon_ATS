@@ -551,37 +551,11 @@ def kv5():
     connection_string_faelles = PROCESS_CONSTANTS["FaellesDbConnectionString"]
 
     root_folder = Path(r"/data")
-    import os
 
-    logger.info(f"{os.path.exists(root_folder) = }")
-    logger.info(f"{os.listdir(root_folder) = }")
-
-    logger.info(f"cwd:            {os.getcwd()}")
-    logger.info(f"root_folder:    {root_folder}")
-    logger.info(f"absolute:       {root_folder.resolve()}")
-    logger.info(f"exists:         {root_folder.exists()}")
-    logger.info(f"is_dir:         {root_folder.is_dir()}")
-    logger.info(f"is_symlink:     {root_folder.is_symlink()}")
-    logger.info(f"is_mount:       {os.path.ismount(root_folder)}")
-
-    import subprocess
-
-    # 1. Does listdir error, or truly return empty?
-    try:
-        entries = os.listdir(root_folder)
-        logger.info(f"os.listdir count: {len(entries)} -> {entries[:20]}")
-    except Exception as e:
-        logger.error(f"os.listdir failed: {e!r}")
-
-    # 2. WHAT is mounted at /data (source + fs type + options)?
-    try:
-        mounts = subprocess.run(
-            ["mount"], capture_output=True, text=True, timeout=10
-        ).stdout
-        data_mounts = [ln for ln in mounts.splitlines() if "/data" in ln]
-        logger.info(f"mount line for /data: {data_mounts or 'NONE'}")
-    except Exception as e:
-        logger.error(f"mount cmd failed: {e!r}")
+    logger.info(f"{root_folder.exists() = }")
+    logger.info(
+        f"Folder in root_folder: {'\n'.join([p.name for p in root_folder.iterdir()])}"
+    )
 
     # --------------------------------------------------
     # Phase 1: Read payroll files (NO SQL)
