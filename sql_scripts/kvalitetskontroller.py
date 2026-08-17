@@ -556,6 +556,14 @@ def kv5():
     logger.info(f"{os.path.exists(root_folder) = }")
     logger.info(f"{os.listdir(root_folder) = }")
 
+    logger.info(f"cwd:            {os.getcwd()}")
+    logger.info(f"root_folder:    {root_folder}")
+    logger.info(f"absolute:       {root_folder.resolve()}")
+    logger.info(f"exists:         {root_folder.exists()}")
+    logger.info(f"is_dir:         {root_folder.is_dir()}")
+    logger.info(f"is_symlink:     {root_folder.is_symlink()}")
+    logger.info(f"is_mount:       {os.path.ismount(root_folder)}")
+
     # --------------------------------------------------
     # Phase 1: Read payroll files (NO SQL)
     # --------------------------------------------------
