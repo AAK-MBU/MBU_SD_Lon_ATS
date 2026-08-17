@@ -586,6 +586,8 @@ def kv5():
 
     run_folders.sort(key=lambda x: x[0], reverse=True)
 
+    logger.info(f"{len(run_folders)} folders found.")
+
     for folder_date, run_folder in run_folders:
         sispo_files = []
 
