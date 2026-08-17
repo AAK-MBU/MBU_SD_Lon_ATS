@@ -552,11 +552,6 @@ def kv5():
 
     root_folder = Path(r"/data")
 
-    logger.info(f"{root_folder.exists() = }")
-    logger.info(
-        f"Folder in root_folder: {'\n'.join([p.name for p in root_folder.iterdir()])}"
-    )
-
     # --------------------------------------------------
     # Phase 1: Read payroll files (NO SQL)
     # --------------------------------------------------
