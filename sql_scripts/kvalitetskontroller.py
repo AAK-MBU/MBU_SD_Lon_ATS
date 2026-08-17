@@ -564,6 +564,25 @@ def kv5():
     logger.info(f"is_symlink:     {root_folder.is_symlink()}")
     logger.info(f"is_mount:       {os.path.ismount(root_folder)}")
 
+    import subprocess
+
+    # 1. Does listdir error, or truly return empty?
+    try:
+        entries = os.listdir(root_folder)
+        logger.info(f"os.listdir count: {len(entries)} -> {entries[:20]}")
+    except Exception as e:
+        logger.error(f"os.listdir failed: {e!r}")
+
+    # 2. WHAT is mounted at /data (source + fs type + options)?
+    try:
+        mounts = subprocess.run(
+            ["mount"], capture_output=True, text=True, timeout=10
+        ).stdout
+        data_mounts = [ln for ln in mounts.splitlines() if "/data" in ln]
+        logger.info(f"mount line for /data: {data_mounts or 'NONE'}")
+    except Exception as e:
+        logger.error(f"mount cmd failed: {e!r}")
+
     # --------------------------------------------------
     # Phase 1: Read payroll files (NO SQL)
     # --------------------------------------------------
