@@ -555,6 +555,7 @@ def kv5():
     # --------------------------------------------------
     # Phase 1: Read payroll files (NO SQL)
     # --------------------------------------------------
+    logger.info("Reading payroll files")
     records = []
     tjenestenumre = set()
     trio_school_codes = set()
@@ -636,6 +637,7 @@ def kv5():
 
                     records.append(record)
 
+    logger.info("Payroll files read")
     print(f"Parsed records        : {len(records)}")
     print(f"Distinct employees    : {len(tjenestenumre)}")
     print(f"Distinct TRIO schools : {len(trio_school_codes)}")
@@ -644,6 +646,7 @@ def kv5():
     # --------------------------------------------------
     # Phase 2: Fetch ACTIVE XA employments (ONE SQL)
     # --------------------------------------------------
+    logger.info("Fetching active XA employments")
     emp_placeholders = ",".join("?" for _ in tjenestenumre)
 
     employee_sql = f"""
@@ -704,9 +707,11 @@ def kv5():
 
         employees_by_tjenestenummer[tjenestenummer] = row
 
+    logger.info("Active XA employments fetched")
     # --------------------------------------------------
     # Phase 2.5: Master data consistency errors
     # --------------------------------------------------
+    logger.info("Master data consistency errors")
     mismatches = []
     seen = set()
 
@@ -728,10 +733,11 @@ def kv5():
             }
         )
         seen.add(key)
-
+    logger.info("Data consistency errors mastered")
     # --------------------------------------------------
     # Phase 3: Fetch TRIO → SD mappings (ONE SQL)
     # --------------------------------------------------
+    logger.info("Fetching TRIO -> SD mappings")
     trio_placeholders = ",".join("?" for _ in trio_school_codes)
 
     mapping_sql = f"""
@@ -755,9 +761,11 @@ def kv5():
     for row in mapping_rows:
         trio_to_sd[str(row["SKOLEKODE"])].add(row["SDafdID"])
 
+    logger.info("TRIO -> SD mappings fetched")
     # --------------------------------------------------
     # Phase 4: Payroll placement validation
     # --------------------------------------------------
+    logger.info("Payroll placement validation")
     for record in records:
         tjenestenummer = record["Tjenestenummer"]
         trio_school_code = record["Trio_school_code"]
@@ -792,6 +800,8 @@ def kv5():
                 )
                 seen.add(key)
 
+    logger.info("Payroll placement validation completed")
+    logger.info("KV5 logic completed")
     # --------------------------------------------------
     # Output
     # --------------------------------------------------
