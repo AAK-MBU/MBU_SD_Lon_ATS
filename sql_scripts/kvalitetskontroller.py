@@ -845,7 +845,8 @@ def compare_wages_month_prior(tjenestenumre: tuple):
                 til.Tjenestenummer,
                 til.AnsættelsesID,
                 CASE WHEN til.Beløb <> 0 THEN til.Beløb END AS Beløb,
-                CASE WHEN til.Beløb = 0  THEN til.Trin  END AS Trin
+                CASE WHEN til.Beløb = 0  THEN til.Trin  END AS Trin,
+                CASE WHEN til.Enhed = 0 THEN 1 ELSE til.Enhed END AS Enhed
             FROM [Personale].[sd_magistrat].[tillæg_mbu] AS til
             WHERE til.Startdato <= DATEADD(MONTH, 0, GETDATE())
             AND til.Slutdato  >  DATEADD(MONTH, 0, GETDATE())
@@ -858,7 +859,8 @@ def compare_wages_month_prior(tjenestenumre: tuple):
                 ans.Tjenestenummer,
                 ans.AnsættelsesID,
                 NULL AS Beløb,
-                ans.Trin AS Trin
+                ans.Trin AS Trin,
+                NULL as Enhed
             FROM [Personale].[sd_magistrat].[Ansættelse_mbu] AS ans
             WHERE ans.Startdato <= DATEADD(MONTH, 0, GETDATE())
             AND ans.Slutdato  >  DATEADD(MONTH, 0, GETDATE())
@@ -869,7 +871,7 @@ def compare_wages_month_prior(tjenestenumre: tuple):
             SELECT
                 Tjenestenummer,
                 AnsættelsesID,
-                COALESCE(SUM(Beløb), 0) AS Sum_Beløb,
+                COALESCE(SUM(Beløb*Enhed), 0) AS Sum_Beløb,
                 COALESCE(SUM(Trin), 0)  AS Sum_Trin
             FROM unified_now
             GROUP BY Tjenestenummer, AnsættelsesID
@@ -881,7 +883,8 @@ def compare_wages_month_prior(tjenestenumre: tuple):
                 til.Tjenestenummer,
                 til.AnsættelsesID,
                 CASE WHEN til.Beløb <> 0 THEN til.Beløb END AS Beløb,
-                CASE WHEN til.Beløb = 0  THEN til.Trin  END AS Trin
+                CASE WHEN til.Beløb = 0  THEN til.Trin  END AS Trin,
+                CASE WHEN til.Enhed = 0 THEN 1 ELSE til.Enhed END AS Enhed
             FROM [Personale].[sd_magistrat].[tillæg_mbu] AS til
             WHERE til.Startdato <= DATEADD(MONTH, -1, GETDATE())
             AND til.Slutdato  >  DATEADD(MONTH, -1, GETDATE())
@@ -894,7 +897,8 @@ def compare_wages_month_prior(tjenestenumre: tuple):
                 ans.Tjenestenummer,
                 ans.AnsættelsesID,
                 NULL AS Beløb,
-                ans.Trin AS Trin
+                ans.Trin AS Trin,
+                NULL as Enhed
             FROM [Personale].[sd_magistrat].[Ansættelse_mbu] AS ans
             WHERE ans.Startdato <= DATEADD(MONTH, -1, GETDATE())
             AND ans.Slutdato  >  DATEADD(MONTH, -1, GETDATE())
@@ -905,7 +909,7 @@ def compare_wages_month_prior(tjenestenumre: tuple):
             SELECT
                 Tjenestenummer,
                 AnsættelsesID,
-                COALESCE(SUM(Beløb), 0) AS Sum_Beløb_Prev,
+                COALESCE(SUM(Beløb*Enhed), 0) AS Sum_Beløb_Prev,
                 COALESCE(SUM(Trin), 0)  AS Sum_Trin_Prev
             FROM unified_prev
             GROUP BY Tjenestenummer, AnsættelsesID
