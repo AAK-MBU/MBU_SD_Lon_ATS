@@ -7,10 +7,10 @@ import sys
 from datetime import datetime
 
 from automation_server_client import Workqueue
-from error_handling import ErrorContext, handle_error
 
 from helpers import config, helper_functions
 from helpers.process_constants import PROCESS_CONSTANTS
+from processes.error_handling import ErrorContext, handle_error
 
 logger = logging.getLogger(__name__)
 
