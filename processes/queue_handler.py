@@ -7,6 +7,7 @@ import sys
 from datetime import datetime
 
 from automation_server_client import Workqueue
+from error_handling import ErrorContext, handle_error
 
 from helpers import config, helper_functions
 from helpers.process_constants import PROCESS_CONSTANTS
@@ -114,11 +115,10 @@ async def concurrent_add(workqueue: Workqueue, items: list[dict]) -> None:
 
                 except Exception as e:
                     if attempt >= config.MAX_RETRIES:
-                        logger.error(
-                            "Failed to add item %s after %d attempts: %s",
-                            reference,
-                            attempt,
-                            e,
+                        handle_error(
+                            error=e,
+                            log=logger.error,
+                            context=ErrorContext(send_mail=True),
                         )
                         return False
 
