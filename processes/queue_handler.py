@@ -4,13 +4,11 @@ import asyncio
 import json
 import logging
 import sys
-
 from datetime import datetime
 
 from automation_server_client import Workqueue
 
-from helpers import config
-from helpers import helper_functions
+from helpers import config, helper_functions
 from helpers.process_constants import PROCESS_CONSTANTS
 
 logger = logging.getLogger(__name__)
@@ -33,23 +31,21 @@ def retrieve_items_for_queue() -> list[dict]:
         raise ValueError("No process defined in sys arguments!")
 
     # Set variables for function call
-    process_procedure = config.PROCESS_PROCEDURE_DICT.get(
-        process,
-        None
-    )
+    process_procedure = config.PROCESS_PROCEDURE_DICT.get(process, None)
     if not process_procedure:
         raise ValueError(f"Process procedure for {process} not defined in dictionary")
 
     control_procedure = process_procedure.get(
         "procedure",
-        ValueError(f"No stored procedure for {process_procedure} in dictionary")
+        ValueError(f"No stored procedure for {process_procedure} in dictionary"),
     )
     procedure_params = process_procedure.get(
-        "parameters",
-        ValueError(f"No parameters for {process_procedure} in dictionary")
+        "parameters", ValueError(f"No parameters for {process_procedure} in dictionary")
     )
 
-    logger.info(f"Running {process = }, procedure {control_procedure.__name__}, {procedure_params = }")
+    logger.info(
+        f"Running {process = }, procedure {control_procedure.__name__}, {procedure_params = }"
+    )
 
     # Get items for process
     retrieved_items = control_procedure(**procedure_params)
@@ -61,12 +57,14 @@ def retrieve_items_for_queue() -> list[dict]:
                 references.append(reference)
 
             else:
-                references.append(f"{process}_{datetime.now().strftime('%d%m%y')}_{i+1}")
+                references.append(
+                    f"{process}_{datetime.now().strftime('%d%m%y')}_{i + 1}"
+                )
 
             formatted_item = helper_functions.format_item(item)
             data.append(formatted_item)
 
-        logger.info(f"Populated queue with {len(retrieved_items)} items.")
+        logger.info(f"Populating queue with {len(retrieved_items)} items.")
 
     else:
         logger.info("No items found. Queue not populated")
