@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 def combine_with_af_email(item_df: pd.DataFrame):
     """Combines items with AF emails from LIS database"""
 
+    connection_string_faelles = PROCESS_CONSTANTS["FaellesDbConnectionString"]
     connection_string_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRINGPROD"]
 
-    af_email = af_losid(connection_str=connection_string_mbu)
+    af_email = af_losid(connection_str=connection_string_faelles)
     af_email_df = pd.DataFrame(af_email).astype({"LOSID": int}, errors="ignore")
     combined_df = pd.merge(left=item_df, right=af_email_df, on="LOSID")
 
@@ -236,24 +237,10 @@ def af_losid(connection_str: str):
     """Get AF per LOSID"""
 
     sql = """
-    SELECT
-        v1.afdemail AS AF_email,
-        v2.LOSID
-    FROM
-        (
-        SELECT
-            adm_faelles_id,
-            lisid
-        FROM
-            [BuMasterdata].[dbo].[MD_ADM_FAELLESSKAB]
-        WHERE
-            STARTDATO <= GETDATE()
-            and SLUTDATO > GETDATE()
-        ) t
-    LEFT JOIN
-        [BuMasterdata].[dbo].[VIEW_MD_STAMDATA_AKTUEL] v1 ON t.adm_faelles_id = v1.lisid
-    LEFT JOIN
-        [BuMasterdata].[dbo].[VIEW_MD_STAMDATA_AKTUEL] v2 ON t.lisid = v2.lisid
+    SELECT TOP (1000)
+        losidEnhed as LOSID,
+        emailAF as AF_email
+    FROM [FDW].[los_stg].[MBU_AF]
     """
 
     af_email_kobling = get_items_from_query(connection_string=connection_str, query=sql)
