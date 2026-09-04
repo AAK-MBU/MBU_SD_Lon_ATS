@@ -1012,6 +1012,21 @@ def kv7(exclude_schoolname: list, exclude_dagtilbudname: list):
         employee_df=almen_employees_df, minimumstillaeg_df=minimumstillaeg_df
     )
 
+    # Add all tillæg periods (active as well as expired and future) for later processing
+    tillaeg_perioder_df = kv7_support_functions.collect_tillaeg(
+        employees_df,
+        json_cols=["Tillægsnummer", "Tillægsnavn", "TillægStart", "TillægSlut"],
+        list_col="Tillaeg_Perioder",
+        group_cols=["AnsættelsesID"],
+    )
+
+    employee_missing_tillaeg = pd.merge(
+        left=employee_missing_tillaeg,
+        right=tillaeg_perioder_df,
+        on="AnsættelsesID",
+        how="left",
+    )
+
     items = helper_functions.item_df_to_item_list(employee_missing_tillaeg)
 
     return items
