@@ -828,11 +828,14 @@ def validate_record(record: dict, file_name: str, line_no: int):
         )
 
     # Per 1/8-2026 findes der tjenestenumre der slutter på A
-    # Fjerner denne validering
-    # if not (record["Tjenestenummer"].isdigit() and len(record["Tjenestenummer"]) == 5):
-    #     raise ValueError(
-    #         f"{file_name} | line {line_no}: key2 must be 5-digits number, got '{record['Tjenestenummer']}'"
-    #     )
+    # Fjerner den validering der kræver kun tal
+    if not (
+        # record["Tjenestenummer"].isdigit() and
+        len(record["Tjenestenummer"]) == 5
+    ):
+        raise ValueError(
+            f"{file_name} | line {line_no}: key2 must be 5-digits number, got '{record['Tjenestenummer']}'"
+        )
 
 
 def compare_wages_month_prior(tjenestenumre: tuple):
