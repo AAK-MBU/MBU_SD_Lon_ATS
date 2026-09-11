@@ -150,7 +150,7 @@ def construct_worker_text(process_type: str, data: dict):
         trio_school_code = data.get("Trio_school_code")
 
         if error == "NO_ACTIVE_XA_EMPLOYMENT":
-            subject = "Ikke eksisterende medarbejder fundet i lønudtræk"
+            subject = "TRIO: Ikke eksisterende medarbejder fundet i lønudtræk"
 
             # Construct message
             text = (
@@ -165,7 +165,7 @@ def construct_worker_text(process_type: str, data: dict):
         else:
             allowed_sd = data.get("Allowed_sd")
 
-            subject = "Medarbejder er tilkoblet forkert TRIO skolekode"
+            subject = "TRIO: Medarbejder er tilkoblet forkert TRIO skolekode"
 
             # Construct message
             text = (
