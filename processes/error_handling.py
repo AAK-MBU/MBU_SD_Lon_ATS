@@ -60,9 +60,10 @@ def handle_error(
 
 
 def send_error_email(
-    error: ProcessError | BusinessError,
+    error: ProcessError | BusinessError | None,
     add_screenshot: bool = False,
     process_name: str | None = None,
+    custom_error_dict: dict | None = None,
 ) -> None:
     """
     Send email to defined recipient with error information
@@ -91,7 +92,12 @@ def send_error_email(
     msg["subject"] = "Error screenshot" + f": {process_name}" if process_name else ""
 
     # Create an HTML message with the exception and screenshot
-    error_dict = error.__dictinfo__()
+    if error:
+        error_dict = error.__dictinfo__()
+    elif custom_error_dict:
+        error_dict = custom_error_dict
+    else:
+        raise ValueError("Need either error or custom_error_dict")
 
     if add_screenshot:
         screenshot = grab_screenshot()
