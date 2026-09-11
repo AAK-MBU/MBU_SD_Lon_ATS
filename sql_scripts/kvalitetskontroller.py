@@ -9,6 +9,7 @@ import pandas as pd
 
 from helpers import helper_functions, kv6_support_functions, kv7_support_functions
 from helpers.process_constants import PROCESS_CONSTANTS
+from processes.error_handling import send_error_email
 
 logger = logging.getLogger(__name__)
 
@@ -612,6 +613,24 @@ def kv5():
                 )
 
             trio_school_code = parts[2]
+            if not trio_school_code:
+                try:
+                    error_dict = {
+                        "type": "Rejst manuelt",
+                        "message": f"Trio filen indeholder ikke en Trio skole kode. \nFilnavn: {file_path}, TRIO kode fundet som tredje element i: {parts}",
+                        "traceback": None,
+                    }
+                    send_error_email(
+                        error=None,
+                        process_name="SD Løn KV5 (TRIO-tjek)",
+                        custom_error_dict=error_dict,
+                    )
+                    continue
+                except Exception:
+                    raise RuntimeError(
+                        f"TRIO school code not found in {file_path}. Resolved to third part in {parts} as {trio_school_code}"
+                    )
+
             trio_school_codes.add(trio_school_code)
 
             with file_path.open("r", encoding="utf-8", errors="replace") as file:
@@ -678,6 +697,7 @@ def kv5():
                     ans.Slutdato IS NULL
                     OR ans.Slutdato > CAST(GETDATE() AS date)
                 )
+                AND ans.Statuskode in ('1','3','5','8')
         )
 
         SELECT
