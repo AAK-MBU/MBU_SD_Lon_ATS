@@ -44,12 +44,15 @@ def item_df_to_item_list(item_df: pd.DataFrame) -> list:
 
 
 def value_formatter(value):
+    """Formatér en værdi rekursivt, så den kan serialiseres til JSON."""
+    if isinstance(value, dict):
+        return {key: value_formatter(v) for key, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [value_formatter(v) for v in value]
     if isinstance(value, date):
-        value = value.strftime("%d-%m-%Y")
-    elif isinstance(value, Decimal):
-        value = int(value)
-    elif isinstance(value, set):
-        value = list(value)
+        return value.strftime("%d-%m-%Y")
+    if isinstance(value, Decimal):
+        return int(value)
     return value
 
 
