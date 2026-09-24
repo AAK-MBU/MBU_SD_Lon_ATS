@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+from datetime import datetime
 
 from helpers import smtp_util
 from helpers.helper_functions import dk_month_relative, find_pair_info, get_tillaeg_navn
@@ -146,39 +147,68 @@ def construct_worker_text(process_type: str, data: dict):
     elif process_type == "KV5":
         error = data.get("Error")
         Folder_date = data.get("Folder_date")
+        file_date = data.get("File date", "")
         file_name = data.get("File_name")
         trio_school_code = data.get("Trio_school_code")
+        allowed_sd = data.get("Allowed_sd", "")
 
-        if error == "NO_ACTIVE_XA_EMPLOYMENT":
-            subject = "TRIO: Ikke eksisterende medarbejder fundet i lønudtræk"
+        trio_messages = {
+            "NO_ACTIVE_XA_EMPLOYMENT": {
+                "subject": "TRIO: Ikke eksisterende medarbejder fundet i lønudtræk",
+                "text": (
+                    "<h4>Følgende tjenestenummer er fundet i et lønudtræk, men eksisterer ikke i MBU's ansættelsesdata</h4>"
+                    + f"<p>Tjenestenummer: {person_id}</p>"
+                    + "<p>Tjenestenummeret blev fundet i et lønudtræk for skole med følgende skolekode:</p>"
+                    + f"<p>TRIO skolekode: {trio_school_code}</p>"
+                    + f"<p>Dato for lønudtrækket: {Folder_date}</p>"
+                    + f"<p>Filnavn: {file_name}</p>"
+                ),
+            },
+            "SD_NOT_VALID_FOR_TRIO": {
+                "subject": "TRIO: Medarbejder er tilkoblet forkert TRIO skolekode",
+                "text": (
+                    "<h4>Følgende medarbejder er tilkoblet den forkerte TRIO skolekode, på baggrund af den SD Afdelingskode, de står med i deres ansættelse</h4>"
+                    + f"<p>Tjenestenummer: {person_id}</p>"
+                    + f"<p>Navn: {person_name}</p>"
+                    + f"<p>Overenskomst: {overenskomst}</p>"
+                    + f"<p>SD institutionskode: {sd_inst_kode}</p>"
+                    + f"<p>SD Afdelingskode: {afdeling}</p>"
+                    + f"<p>TRIO skolekode: {trio_school_code}</p>"
+                    + f"<p>Følgende SD afdelingskoder er tilkoblet skolekode {trio_school_code}:</p>"
+                    + f"<p>{allowed_sd}:</p>"
+                ),
+            },
+            "XA_EMPLOYMENT_NON_ACTIVE": {
+                "subject": "TRIO: Løn registreret på ikke-aktiv ansættelser",
+                "text": (
+                    "<h4>Følgende tjenestenummer har registreret løn på en dato uden aktiv ansættelse med en ikke-aktiv ansættelse</h4>"
+                    + f"<p>Tjenestenummer: {person_id}</p>"
+                    + f"<p>Navn: {person_name}</p>"
+                    + f"<p>Dato for lønregistrering: {file_date}</p>"
+                    + f"<p>Status på ikke-aktiv ansættelse: {data.get('status_text')}"
+                    + f"<p>Startdato for ikke-aktiv ansættelse: {data.get('non_active_start')}"
+                    + f"<p>Slutdato for ikke-aktiv ansættelse: {data.get('non_active_end')}"
+                    + "<p>Ansættelser på samme tjenestenummer, i andre perioder:</p>"
+                    + (
+                        "".join(
+                            "<ul>"
+                            + f"<li>Navn: {e.get('Navn')}</li>"
+                            + f"<li>Afdeling: {e.get('Afdeling')}</li>"
+                            + f"<li>Startdato: {e.get('Startdato')}</li>"
+                            + f"<li>Slutdato: {e.get('Slutdato')}</li>"
+                            + f"<li>Status for ansættelse: {e.get('StatusTekst')}</li>"
+                            + "</ul>"
+                            for e in data.get("other_employments", [])
+                        )
+                        or "<p>Ingen ansættelser fundet.</p>"
+                    )
+                ),
+            },
+        }
 
-            # Construct message
-            text = (
-                "<h4>Følgende tjenestenummer er fundet i et lønudtræk, men eksisterer ikke i MBU's ansættelsesdata</h4>"
-                + f"<p>Tjenestenummer: {person_id}</p>"
-                + "<p>Tjenestenummeret blev fundet i et lønudtræk for skole med følgende skolekode:</p>"
-                + f"<p>TRIO skolekode: {trio_school_code}</p>"
-                + f"<p>Dato for lønudtrækket: {Folder_date}</p>"
-                + f"<p>Filnavn: {file_name}</p>"
-            )
-
-        else:
-            allowed_sd = data.get("Allowed_sd")
-
-            subject = "TRIO: Medarbejder er tilkoblet forkert TRIO skolekode"
-
-            # Construct message
-            text = (
-                "<h4>Følgende medarbejder er tilkoblet den forkerte TRIO skolekode, på baggrund af den SD Afdelingskode, de står med i deres ansættelse</h4>"
-                + f"<p>Tjenestenummer: {person_id}</p>"
-                + f"<p>Navn: {person_name}</p>"
-                + f"<p>Overenskomst: {overenskomst}</p>"
-                + f"<p>SD institutionskode: {sd_inst_kode}</p>"
-                + f"<p>SD Afdelingskode: {afdeling}</p>"
-                + f"<p>TRIO skolekode: {trio_school_code}</p>"
-                + f"<p>Følgende SD afdelingskoder er tilkoblet skolekode {trio_school_code}:</p>"
-                + f"<p>{allowed_sd}:</p>"
-            )
+        msg = trio_messages[error]
+        subject = msg["subject"]
+        text = msg["text"]
 
     elif process_type == "KV6":
         prev_beloeb = data.get("sum_tillægsbeløb_forrige", None)
