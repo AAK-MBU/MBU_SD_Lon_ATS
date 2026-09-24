@@ -2,7 +2,7 @@
 
 import logging
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -560,6 +560,7 @@ def kv5():
     records = []
     tjenestenumre = set()
     trio_school_codes = set()
+    dates = set()
 
     run_folders = []
 
@@ -613,6 +614,8 @@ def kv5():
                 )
 
             trio_school_code = parts[2]
+            file_date = datetime.strptime(parts[1][:6], "%y%m%d").date()
+
             if not trio_school_code:
                 try:
                     error_dict = {
@@ -642,6 +645,7 @@ def kv5():
 
                     record = {
                         "Folder_date": folder_date,
+                        "File date": file_date,
                         "Trio_school_code": trio_school_code,
                         "File_name": file_path.name,
                         "Line_no": line_no,
@@ -651,6 +655,7 @@ def kv5():
                         record[key] = line[start:end].strip()
 
                     tjenestenumre.add(record["Tjenestenummer"])
+                    dates.add(record["File date"])
 
                     validate_record(
                         record=record, file_name=file_path.name, line_no=line_no
@@ -670,6 +675,10 @@ def kv5():
     logger.info("Fetching active XA employments")
     emp_placeholders = ",".join("?" for _ in tjenestenumre)
 
+    # Første og sidste dato for lønindberetninger (baseret på filnavne)
+    min_date_placeholder = min(dates)
+    max_date_placeholder = max(dates)
+
     employee_sql = f"""
         WITH ActiveEmployments AS (
             SELECT
@@ -679,27 +688,23 @@ def kv5():
                 ans.[Institutionskode],
                 ans.Overenskomst,
                 ans.[Afdeling],
-
-                COUNT(*) OVER (
-                    PARTITION BY ans.[Tjenestenummer]
-                ) AS active_count
+                ans.[Startdato],
+                ans.[Slutdato],
+                ans.[Statuskode],
+                sta.[StatusTekst]
 
             FROM
                 [Personale].[sd_magistrat].[Ansættelse_mbu] ans
             LEFT JOIN
                 [Personale].[sd].[personStam] per
                     ON ans.CPR = per.CPR
+            LEFT JOIN
+                [Personale].[sd].[Statuskode] sta
+                    ON ans.Statuskode = sta.Statuskode
             WHERE
                 ans.[Tjenestenummer] IN ({emp_placeholders})
                 AND ans.[Institutionskode] = 'XA'
-                AND ans.Startdato <= CAST(GETDATE() AS date)
-                AND (
-                    ans.Slutdato IS NULL
-                    OR ans.Slutdato > CAST(GETDATE() AS date)
-                )
-                AND ans.Statuskode in ('1','3','5','8')
         )
-
         SELECT
             Navn,
             Tjenestenummer,
@@ -707,7 +712,10 @@ def kv5():
             Institutionskode,
             Overenskomst,
             Afdeling,
-            active_count
+            Startdato,
+            Slutdato,
+            Statuskode,
+            StatusTekst
         FROM ActiveEmployments
     """
 
@@ -717,48 +725,22 @@ def kv5():
         params=list(tjenestenumre),
     )
 
-    employees_by_tjenestenummer = {}
-    multiple_active_employments = []
+    employee_df = pd.DataFrame(employee_rows)
 
-    for row in employee_rows:
-        tjenestenummer = row["Tjenestenummer"]
+    # Opdel ansættelser i aktive/ikke-aktive
+    active_list = ["1", "3", "5"]
+    active_employees = employee_df[employee_df["Statuskode"].isin(active_list)]
+    non_active_employees = employee_df[~employee_df["Statuskode"].isin(active_list)]
 
-        if row["active_count"] > 1:
-            multiple_active_employments.append(row)
-            continue
+    logger.info(
+        f"XA employments fetched for relevant period ({min_date_placeholder} - {max_date_placeholder})"
+    )
 
-        employees_by_tjenestenummer[tjenestenummer] = row
-
-    logger.info("Active XA employments fetched")
-    # --------------------------------------------------
-    # Phase 2.5: Master data consistency errors
-    # --------------------------------------------------
-    logger.info("Master data consistency errors")
-    mismatches = []
-    seen = set()
-
-    for row in multiple_active_employments:
-        tjenestenummer = row["Tjenestenummer"]
-        key = (tjenestenummer, "MULTIPLE_ACTIVE_EMPLOYMENTS")
-
-        if key in seen:
-            continue
-
-        mismatches.append(
-            {
-                "Tjenestenummer": tjenestenummer,
-                "Overenskomst": row["Overenskomst"],
-                "Navn": row["Navn"],
-                "Institutionskode": row["Institutionskode"],
-                "Afdeling": row["Afdeling"],
-                "Error": "MULTIPLE_ACTIVE_EMPLOYMENTS",
-            }
-        )
-        seen.add(key)
-    logger.info("Data consistency errors mastered")
-    # --------------------------------------------------
+    # # --------------------------------------------------
     # Phase 3: Fetch TRIO → SD mappings (ONE SQL)
     # --------------------------------------------------
+    mismatches = []
+    seen = set()
     logger.info("Fetching TRIO -> SD mappings")
     trio_placeholders = ",".join("?" for _ in trio_school_codes)
 
@@ -791,10 +773,65 @@ def kv5():
     for record in records:
         tjenestenummer = record["Tjenestenummer"]
         trio_school_code = record["Trio_school_code"]
+        record_date = record[
+            "File date"
+        ]  # Ligner måske at den ikke bruges, men bruges i queries
 
-        employee = employees_by_tjenestenummer.get(tjenestenummer)
+        employee = active_employees.query(
+            "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
+        )
+        if len(employee) > 1:
+            row = employee.to_dict(orient="records")[0]
+            key = (tjenestenummer, "MULTIPLE_ACTIVE_EMPLOYMENTS")
+            if key not in seen:
+                mismatches.append(
+                    {
+                        "Tjenestenummer": tjenestenummer,
+                        "Overenskomst": row["Overenskomst"],
+                        "Navn": row["Navn"],
+                        "Institutionskode": row["Institutionskode"],
+                        "Afdeling": row["Afdeling"],
+                        "Error": "MULTIPLE_ACTIVE_EMPLOYMENTS",
+                    }
+                )
+                seen.add(key)
+            continue
 
-        if not employee:
+        if len(employee) == 0:  # Ikke aktiv ansættelse i den relevante periode
+            non_active_row = non_active_employees.query(
+                "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
+            ).to_dict(orient="records")[0]
+            if len(
+                non_active_row
+            ):  # Har en ikke-atkiv ansættelsesrække i relevant periode
+                key = (tjenestenummer, "XA_EMPLOYMENT_NON_ACTIVE")
+                # Find ansættelser på tjenestenumret uden for perioden
+                other_employments = (
+                    employee_df.query(
+                        (
+                            "Tjenestenummer == @tjenestenummer "
+                            + "and (Startdato > @record_date or Slutdato <= @record_date)"
+                        )
+                    )
+                    .sort_values("Slutdato", ascending=False)
+                    .to_dict(orient="records")
+                )
+                if key not in seen:
+                    mismatches.append(
+                        {
+                            **record,
+                            "Navn": non_active_row["Navn"],
+                            "status_text": non_active_row["StatusTekst"],
+                            "non_active_start": non_active_row["Startdato"],
+                            "non_active_end": non_active_row["Slutdato"],
+                            "other_employments": other_employments,
+                            "Error": "XA_EMPLOYMENT_NON_ACTIVE",
+                        }
+                    )
+                    seen.add(key)
+
+                continue
+
             key = (tjenestenummer, "NO_ACTIVE_XA_EMPLOYMENT")
 
             if key not in seen:
@@ -803,6 +840,7 @@ def kv5():
 
             continue
 
+        employee = employee.to_dict(orient="records")[0]
         afdeling = employee["Afdeling"]
         allowed_sd = trio_to_sd.get(trio_school_code, set())
 
