@@ -847,6 +847,8 @@ def kv5():
                         "record_employments": record_employments,
                         "wage_employments": wage_employments,
                         "cpr_employments": cpr_employments,
+                        "active_on_record": not active_on_record.empty,
+                        "active_on_wage": not active_on_wage.empty,
                         "Error": "NO_ACTIVE_XA_EMPLOYMENT"
                         if not record_employments + wage_employments
                         else "XA_EMPLOYMENT_NON_ACTIVE",

@@ -171,6 +171,11 @@ def construct_worker_text(process_type: str, data: dict):
         file_name = data.get("File_name")
         trio_school_code = data.get("Trio_school_code")
         allowed_sd = data.get("Allowed_sd", "")
+        inactive_dates = {
+            (False, True): "indberetningsdatoen",
+            (True, False): "løndatoen",
+            (False, False): "både indberetnings- og løndatoen",
+        }.get((data.get("active_on_record"), data.get("active_on_wage")))
 
         trio_messages = {
             "NO_ACTIVE_XA_EMPLOYMENT": {
@@ -201,7 +206,7 @@ def construct_worker_text(process_type: str, data: dict):
             "XA_EMPLOYMENT_NON_ACTIVE": {
                 "subject": "TRIO: Løn registreret på ikke-aktiv ansættelse",
                 "text": (
-                    "<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på indberetnings- og/eller løndatoen</h4>"
+                    f"<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på {inactive_dates}</h4>"
                     + f"<p>Tjenestenummer: {person_id}</p>"
                     + f"<p>Navn: {person_name}</p>"
                     + f"<p>Filnavn: {file_name}</p>"
