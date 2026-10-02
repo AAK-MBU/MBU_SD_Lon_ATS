@@ -546,6 +546,9 @@ def kv5():
     fields = {
         "Institutionskode": (0, 2),
         "Tjenestenummer": (6, 11),
+        "Lønår": (15, 17),
+        "Lønmåned": (17, 19),
+        "Løndato": (21, 23),
     }
 
     connection_string_mbu = PROCESS_CONSTANTS["DBCONNECTIONSTRINGPROD"]
@@ -654,8 +657,15 @@ def kv5():
                     for key, (start, end) in fields.items():
                         record[key] = line[start:end].strip()
 
+                    record["Wage date"] = date.fromisoformat(
+                        f"20{record['Lønår']}{record['Lønmåned']}{record['Løndato']}"
+                    )
+
                     tjenestenumre.add(record["Tjenestenummer"])
-                    dates.add(record["File date"])
+                    dates.add(
+                        record["File date"]
+                    )  # Tilføj både løndato og indebretningsdato til tjek
+                    dates.add(record["Wage date"])
 
                     validate_record(
                         record=record, file_name=file_path.name, line_no=line_no
@@ -683,6 +693,7 @@ def kv5():
         WITH ActiveEmployments AS (
             SELECT
                 per.[Navn],
+                per.[CPR],
                 ans.[Tjenestenummer],
                 ans.[AnsættelsesID],
                 ans.[Institutionskode],
@@ -707,6 +718,7 @@ def kv5():
         )
         SELECT
             Navn,
+            CPR,
             Tjenestenummer,
             AnsættelsesID,
             Institutionskode,
@@ -776,35 +788,38 @@ def kv5():
         record_date = record[
             "File date"
         ]  # Ligner måske at den ikke bruges, men bruges i queries
+        wage_date = record["Wage date"]
 
+        # Find aktive ansættelser på tjenestenummeret på løndatoen
         employee = active_employees.query(
             "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
         )
-        if len(employee) > 1:
-            row = employee.to_dict(orient="records")[0]
-            key = (tjenestenummer, "MULTIPLE_ACTIVE_EMPLOYMENTS")
-            if key not in seen:
-                mismatches.append(
-                    {
-                        "Tjenestenummer": tjenestenummer,
-                        "Overenskomst": row["Overenskomst"],
-                        "Navn": row["Navn"],
-                        "Institutionskode": row["Institutionskode"],
-                        "Afdeling": row["Afdeling"],
-                        "Error": "MULTIPLE_ACTIVE_EMPLOYMENTS",
-                    }
-                )
-                seen.add(key)
-            continue
+        # if len(employee) > 1:
+        #     row = employee.to_dict(orient="records")[0]
+        #     key = (tjenestenummer, "MULTIPLE_ACTIVE_EMPLOYMENTS")
+        #     if key not in seen:
+        #         mismatches.append(
+        #             {
+        #                 "Tjenestenummer": tjenestenummer,
+        #                 "Overenskomst": row["Overenskomst"],
+        #                 "Navn": row["Navn"],
+        #                 "Institutionskode": row["Institutionskode"],
+        #                 "Afdeling": row["Afdeling"],
+        #                 "Error": "MULTIPLE_ACTIVE_EMPLOYMENTS",
+        #             }
+        #         )
+        #         seen.add(key)
+        #     continue
 
         if len(employee) == 0:  # Ikke aktiv ansættelse i den relevante periode
+            ## --- TJEK FOR ANSÆTTELSE MED STATUSKODE -> IKKE-AKTIV --- ##
             non_active_row = non_active_employees.query(
                 "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
             ).to_dict(orient="records")[0]
-            if len(
-                non_active_row
+            if (
+                len(non_active_row) > 0
             ):  # Har en ikke-atkiv ansættelsesrække i relevant periode
-                key = (tjenestenummer, "XA_EMPLOYMENT_NON_ACTIVE")
+                key = (tjenestenummer, "XA_EMPLOYMENT_NON_ACTIVE_RECORD")
                 # Find ansættelser på tjenestenumret uden for perioden
                 other_employments = (
                     employee_df.query(

@@ -178,10 +178,10 @@ def construct_worker_text(process_type: str, data: dict):
                     + f"<p>{allowed_sd}:</p>"
                 ),
             },
-            "XA_EMPLOYMENT_NON_ACTIVE": {
-                "subject": "TRIO: Løn registreret på ikke-aktiv ansættelser",
+            "XA_EMPLOYMENT_NON_ACTIVE_RECORD": {
+                "subject": "TRIO: Løn registreret på ikke-aktiv ansættelse",
                 "text": (
-                    "<h4>Følgende tjenestenummer har registreret løn på en dato uden aktiv ansættelse med en ikke-aktiv ansættelse</h4>"
+                    "<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på indberetningsdatoen</h4>"
                     + f"<p>Tjenestenummer: {person_id}</p>"
                     + f"<p>Navn: {person_name}</p>"
                     + f"<p>Dato for lønregistrering: {file_date}</p>"
