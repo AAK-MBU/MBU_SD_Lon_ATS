@@ -37,6 +37,26 @@ def handle_email(data: dict, process_type: str, notification_receiver: str):
     logger.info(f"E-mail sent to {receiver}")
 
 
+def employment_list(employments: list) -> str:
+    """Formatér en liste af ansættelser som HTML-lister."""
+    return "".join(
+        "<ul>"
+        + "".join(
+            f"<li>{label}: {e.get(key)}</li>"
+            for label, key in [
+                ("Tjenestenummer", "Tjenestenummer"),
+                ("Institutionskode", "Institutionskode"),
+                ("Afdeling", "Afdeling"),
+                ("Startdato", "Startdato"),
+                ("Slutdato", "Slutdato"),
+                ("Status for ansættelse", "StatusTekst"),
+            ]
+        )
+        + "</ul>"
+        for e in employments
+    ) or "<p>Ingen ansættelser fundet.</p>"
+
+
 def construct_worker_text(process_type: str, data: dict):
     """Function to construct text for the different processes"""
 
@@ -178,29 +198,22 @@ def construct_worker_text(process_type: str, data: dict):
                     + f"<p>{allowed_sd}:</p>"
                 ),
             },
-            "XA_EMPLOYMENT_NON_ACTIVE_RECORD": {
+            "XA_EMPLOYMENT_NON_ACTIVE": {
                 "subject": "TRIO: Løn registreret på ikke-aktiv ansættelse",
                 "text": (
-                    "<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på indberetningsdatoen</h4>"
+                    "<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på indberetnings- og/eller løndatoen</h4>"
                     + f"<p>Tjenestenummer: {person_id}</p>"
                     + f"<p>Navn: {person_name}</p>"
-                    + f"<p>Dato for lønregistrering: {file_date}</p>"
-                    + f"<p>Status på ikke-aktiv ansættelse: {data.get('status_text')}"
-                    + f"<p>Startdato for ikke-aktiv ansættelse: {data.get('non_active_start')}"
-                    + f"<p>Slutdato for ikke-aktiv ansættelse: {data.get('non_active_end')}"
-                    + "<p>Ansættelser på samme tjenestenummer, i andre perioder:</p>"
+                    + f"<p>Filnavn: {file_name}</p>"
+                    + f"<p>Ansættelser på indberetningsdatoen ({file_date}):</p>"
+                    + employment_list(data.get("record_employments", []))
+                    + f"<p>Ansættelser på løndatoen ({data.get('Wage date')}):</p>"
+                    + employment_list(data.get("wage_employments", []))
                     + (
-                        "".join(
-                            "<ul>"
-                            + f"<li>Navn: {e.get('Navn')}</li>"
-                            + f"<li>Afdeling: {e.get('Afdeling')}</li>"
-                            + f"<li>Startdato: {e.get('Startdato')}</li>"
-                            + f"<li>Slutdato: {e.get('Slutdato')}</li>"
-                            + f"<li>Status for ansættelse: {e.get('StatusTekst')}</li>"
-                            + "</ul>"
-                            for e in data.get("other_employments", [])
-                        )
-                        or "<p>Ingen ansættelser fundet.</p>"
+                        "<p>Alle ansættelser på medarbejderens CPR-nr.:</p>"
+                        + employment_list(data["cpr_employments"])
+                        if data.get("cpr_employments")
+                        else ""
                     )
                 ),
             },

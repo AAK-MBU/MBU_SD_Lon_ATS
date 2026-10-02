@@ -742,7 +742,26 @@ def kv5():
     # Opdel ansættelser i aktive/ikke-aktive
     active_list = ["1", "3", "5"]
     active_employees = employee_df[employee_df["Statuskode"].isin(active_list)]
-    non_active_employees = employee_df[~employee_df["Statuskode"].isin(active_list)]
+
+    # Alle ansættelsesperioder på et CPR-nr.
+    cpr_employment_sql = """
+        SELECT
+            ans.[Tjenestenummer],
+            ans.[Institutionskode],
+            ans.[Afdeling],
+            ans.[Startdato],
+            ans.[Slutdato],
+            sta.[StatusTekst]
+        FROM
+            [Personale].[sd_magistrat].[Ansættelse_mbu] ans
+        LEFT JOIN
+            [Personale].[sd].[Statuskode] sta
+                ON ans.Statuskode = sta.Statuskode
+        WHERE
+            ans.[CPR] = ?
+        ORDER BY
+            ans.[Slutdato] DESC
+    """
 
     logger.info(
         f"XA employments fetched for relevant period ({min_date_placeholder} - {max_date_placeholder})"
@@ -790,72 +809,54 @@ def kv5():
         ]  # Ligner måske at den ikke bruges, men bruges i queries
         wage_date = record["Wage date"]
 
-        # Find aktive ansættelser på tjenestenummeret på løndatoen
-        employee = active_employees.query(
+        # Find aktive ansættelser på tjenestenummeret på indberetnings- og løndatoen
+        active_on_record = active_employees.query(
             "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
         )
-        # if len(employee) > 1:
-        #     row = employee.to_dict(orient="records")[0]
-        #     key = (tjenestenummer, "MULTIPLE_ACTIVE_EMPLOYMENTS")
-        #     if key not in seen:
-        #         mismatches.append(
-        #             {
-        #                 "Tjenestenummer": tjenestenummer,
-        #                 "Overenskomst": row["Overenskomst"],
-        #                 "Navn": row["Navn"],
-        #                 "Institutionskode": row["Institutionskode"],
-        #                 "Afdeling": row["Afdeling"],
-        #                 "Error": "MULTIPLE_ACTIVE_EMPLOYMENTS",
-        #             }
-        #         )
-        #         seen.add(key)
-        #     continue
+        active_on_wage = active_employees.query(
+            "Tjenestenummer == @tjenestenummer and Startdato <= @wage_date < Slutdato"
+        )
 
-        if len(employee) == 0:  # Ikke aktiv ansættelse i den relevante periode
-            ## --- TJEK FOR ANSÆTTELSE MED STATUSKODE -> IKKE-AKTIV --- ##
-            non_active_row = non_active_employees.query(
-                "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
-            ).to_dict(orient="records")[0]
-            if (
-                len(non_active_row) > 0
-            ):  # Har en ikke-atkiv ansættelsesrække i relevant periode
-                key = (tjenestenummer, "XA_EMPLOYMENT_NON_ACTIVE_RECORD")
-                # Find ansættelser på tjenestenumret uden for perioden
-                other_employments = (
-                    employee_df.query(
-                        (
-                            "Tjenestenummer == @tjenestenummer "
-                            + "and (Startdato > @record_date or Slutdato <= @record_date)"
-                        )
-                    )
-                    .sort_values("Slutdato", ascending=False)
-                    .to_dict(orient="records")
-                )
-                if key not in seen:
-                    mismatches.append(
-                        {
-                            **record,
-                            "Navn": non_active_row["Navn"],
-                            "status_text": non_active_row["StatusTekst"],
-                            "non_active_start": non_active_row["Startdato"],
-                            "non_active_end": non_active_row["Slutdato"],
-                            "other_employments": other_employments,
-                            "Error": "XA_EMPLOYMENT_NON_ACTIVE",
-                        }
-                    )
-                    seen.add(key)
-
-                continue
-
-            key = (tjenestenummer, "NO_ACTIVE_XA_EMPLOYMENT")
-
+        if len(active_on_record) == 0 or len(active_on_wage) == 0:
+            key = (tjenestenummer, "XA_EMPLOYMENT_NON_ACTIVE")
             if key not in seen:
-                mismatches.append({**record, "Error": "NO_ACTIVE_XA_EMPLOYMENT"})
+                # Alle ansættelser (uanset status) på hver af de to datoer
+                record_employments = employee_df.query(
+                    "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
+                ).to_dict(orient="records")
+                wage_employments = employee_df.query(
+                    "Tjenestenummer == @tjenestenummer and Startdato <= @wage_date < Slutdato"
+                ).to_dict(orient="records")
+
+                # Aktiv ved indberetning men ikke ved løn: find alle ansættelser på personens CPR
+                cpr_employments = []
+                if len(active_on_record) > 0:
+                    cpr_employments = helper_functions.get_items_from_query_with_params(
+                        connection_string=connection_string_faelles,
+                        query=cpr_employment_sql,
+                        params=[active_on_record.iloc[0]["CPR"]],
+                    )
+
+                mismatches.append(
+                    {
+                        **record,
+                        "Navn": next(
+                            (e["Navn"] for e in record_employments + wage_employments),
+                            None,
+                        ),
+                        "record_employments": record_employments,
+                        "wage_employments": wage_employments,
+                        "cpr_employments": cpr_employments,
+                        "Error": "NO_ACTIVE_XA_EMPLOYMENT"
+                        if not record_employments + wage_employments
+                        else "XA_EMPLOYMENT_NON_ACTIVE",
+                    }
+                )
                 seen.add(key)
 
             continue
 
-        employee = employee.to_dict(orient="records")[0]
+        employee = active_on_record.to_dict(orient="records")[0]
         afdeling = employee["Afdeling"]
         allowed_sd = trio_to_sd.get(trio_school_code, set())
 
