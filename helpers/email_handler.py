@@ -39,22 +39,25 @@ def handle_email(data: dict, process_type: str, notification_receiver: str):
 
 def employment_list(employments: list) -> str:
     """Formatér en liste af ansættelser som HTML-lister."""
-    return "".join(
-        "<ul>"
-        + "".join(
-            f"<li>{label}: {e.get(key)}</li>"
-            for label, key in [
-                ("Tjenestenummer", "Tjenestenummer"),
-                ("Institutionskode", "Institutionskode"),
-                ("Afdeling", "Afdeling"),
-                ("Startdato", "Startdato"),
-                ("Slutdato", "Slutdato"),
-                ("Status for ansættelse", "StatusTekst"),
-            ]
+    return (
+        "".join(
+            "<ul>"
+            + "".join(
+                f"<li>{label}: {e.get(key)}</li>"
+                for label, key in [
+                    ("Tjenestenummer", "Tjenestenummer"),
+                    ("Institutionskode", "Institutionskode"),
+                    ("Afdeling", "Afdeling"),
+                    ("Startdato", "Startdato"),
+                    ("Slutdato", "Slutdato"),
+                    ("Status for ansættelse", "StatusTekst"),
+                ]
+            )
+            + "</ul>"
+            for e in employments
         )
-        + "</ul>"
-        for e in employments
-    ) or "<p>Ingen ansættelser fundet.</p>"
+        or "<p>Ingen ansættelser fundet.</p>"
+    )
 
 
 def construct_worker_text(process_type: str, data: dict):
@@ -168,17 +171,13 @@ def construct_worker_text(process_type: str, data: dict):
         error = data.get("Error")
         Folder_date = data.get("Folder_date")
         file_date = data.get("File date", "")
+        wage_date = data.get("Wage date", "")
         file_name = data.get("File_name")
         trio_school_code = data.get("Trio_school_code")
         allowed_sd = data.get("Allowed_sd", "")
-        inactive_dates = {
-            (False, True): "indberetningsdatoen",
-            (True, False): "løndatoen",
-            (False, False): "både indberetnings- og løndatoen",
-        }.get((data.get("active_on_record"), data.get("active_on_wage")))
 
         trio_messages = {
-            "NO_ACTIVE_XA_EMPLOYMENT": {
+            "NO_EMPLOYMENT": {
                 "subject": "TRIO: Ikke eksisterende medarbejder fundet i lønudtræk",
                 "text": (
                     "<h4>Følgende tjenestenummer er fundet i et lønudtræk, men eksisterer ikke i MBU's ansættelsesdata</h4>"
@@ -203,23 +202,30 @@ def construct_worker_text(process_type: str, data: dict):
                     + f"<p>{allowed_sd}:</p>"
                 ),
             },
-            "XA_EMPLOYMENT_NON_ACTIVE": {
-                "subject": "TRIO: Løn registreret på ikke-aktiv ansættelse",
+            "EMPLOYMENT_NOT_ACTIVE_ON_WAGE": {
+                "subject": "TRIO: Løn registreret på ansættelse inaktiv på løndatoen",
                 "text": (
-                    f"<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på {inactive_dates}</h4>"
+                    "<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på løndatoen</h4>"
                     + f"<p>Tjenestenummer: {person_id}</p>"
                     + f"<p>Navn: {person_name}</p>"
                     + f"<p>Filnavn: {file_name}</p>"
-                    + f"<p>Ansættelser på indberetningsdatoen ({file_date}):</p>"
-                    + employment_list(data.get("record_employments", []))
-                    + f"<p>Ansættelser på løndatoen ({data.get('Wage date')}):</p>"
+                    + f"<p>Tjenestenummerets ansættelsessatus på løndatoen ({wage_date}):</p>"
                     + employment_list(data.get("wage_employments", []))
-                    + (
-                        "<p>Alle ansættelser på medarbejderens CPR-nr.:</p>"
-                        + employment_list(data["cpr_employments"])
-                        if data.get("cpr_employments")
-                        else ""
-                    )
+                    + "<p>Alle ansættelser på det CPR-nr. der senest var tilknyttet tjenestenummeret:</p>"
+                    + employment_list(data["cpr_employments"])
+                ),
+            },
+            "EMPLOYMENT_NOT_ACTIVE_ON_RECORD_ACTIVE_ON_WAGE": {
+                "subject": "TRIO: Løn registreret på ansættelse inaktiv på indberetningsdatoen",
+                "text": (
+                    "<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på indberetningsdatoen</h4>"
+                    + f"<p>Tjenestenummer: {person_id}</p>"
+                    + f"<p>Navn: {person_name}</p>"
+                    + f"<p>Filnavn: {file_name}</p>"
+                    + f"<p>Tjenestenummerets ansættelsessatus på registreringsdatoen ({file_date}):</p>"
+                    + employment_list(data.get("wage_employments", []))
+                    + f"<p>Tjenestenummerets ansættelsessatus på løndatoen ({wage_date}):</p>"
+                    + employment_list(data.get("wage_employments", []))
                 ),
             },
         }

@@ -745,22 +745,70 @@ def kv5():
 
     # Alle ansættelsesperioder på et CPR-nr.
     cpr_employment_sql = """
+        WITH Ansaettelseslinjer AS (
+            SELECT
+                per.[Navn],
+                ans.[Tjenestenummer],
+                ans.[Institutionskode],
+                ans.[Afdeling],
+                ans.[Startdato],
+                ans.[Slutdato],
+                ans.[Statuskode],
+                sta.[StatusTekst],
+                LEAD(ans.[Statuskode]) OVER (
+                    PARTITION BY ans.[Institutionskode], ans.[Tjenestenummer], ans.[CPR]
+                    ORDER BY ans.[Startdato]
+                ) AS NaesteStatuskode
+            FROM
+                [Personale].[sd_magistrat].[Ansættelse_mbu] ans
+            LEFT JOIN
+                [Personale].[sd].[Statuskode] sta
+                    ON ans.Statuskode = sta.Statuskode
+            LEFT JOIN
+                [Personale].[sd].[personStam] per
+                    ON ans.CPR = per.CPR
+            WHERE
+                ans.[CPR] = ?
+        )
         SELECT
-            ans.[Tjenestenummer],
-            ans.[Institutionskode],
-            ans.[Afdeling],
-            ans.[Startdato],
-            ans.[Slutdato],
-            sta.[StatusTekst]
+            Tjenestenummer,
+            Institutionskode,
+            Afdeling,
+            Startdato,
+            Slutdato,
+            StatusTekst
+        FROM
+            Ansaettelseslinjer
+        WHERE
+            CAST(Slutdato AS date) > DATEADD(year, -1, CAST(GETDATE() AS date))
+            AND (
+                Statuskode IN ('1', '3', '5')
+                OR (
+                    CAST(Slutdato AS date) <> '9999-12-31'
+                    AND NaesteStatuskode IN ('1', '3', '5')
+                )
+            )
+        ORDER BY
+            Slutdato DESC
+    """
+
+    latest_cpr_sql = """
+        SELECT TOP (1)
+            ans.[CPR],
+            per.[Navn]
         FROM
             [Personale].[sd_magistrat].[Ansættelse_mbu] ans
         LEFT JOIN
             [Personale].[sd].[Statuskode] sta
                 ON ans.Statuskode = sta.Statuskode
+        LEFT JOIN
+            [Personale].[sd].[personStam] per
+                ON ans.CPR = per.CPR
         WHERE
-            ans.[CPR] = ?
+            ans.Tjenestenummer = ?
+            and ans.Statuskode != 'S'
         ORDER BY
-            ans.[Slutdato] DESC
+            ans.[Startdato] DESC
     """
 
     logger.info(
@@ -807,51 +855,85 @@ def kv5():
         record_date = record[
             "File date"
         ]  # Ligner måske at den ikke bruges, men bruges i queries
-        wage_date = record["Wage date"]
+        wage_date = record[
+            "Wage date"
+        ]  # Ligner måske at den ikke bruges, men bruges i queries
+
+        in_data = employee_df.query("Tjenestenummer == @tjenestenummer")
 
         # Find aktive ansættelser på tjenestenummeret på indberetnings- og løndatoen
         active_on_record = active_employees.query(
-            "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
+            "Tjenestenummer == @tjenestenummer and Startdato <= @record_date <= Slutdato"
         )
         active_on_wage = active_employees.query(
-            "Tjenestenummer == @tjenestenummer and Startdato <= @wage_date < Slutdato"
+            "Tjenestenummer == @tjenestenummer and Startdato <= @wage_date <= Slutdato"
         )
 
+        emp_cpr = "Ukendt"
+        emp_navn = "Ukendt"
+
+        # Ved inaktiv på én af datoerne
         if len(active_on_record) == 0 or len(active_on_wage) == 0:
-            key = (tjenestenummer, "XA_EMPLOYMENT_NON_ACTIVE")
-            if key not in seen:
-                # Alle ansættelser (uanset status) på hver af de to datoer
-                record_employments = employee_df.query(
-                    "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
-                ).to_dict(orient="records")
+            # Hvis slet ikke i løndata
+            if len(in_data) == 0:
+                error_type = "NO_EMPLOYMENT"
+                record_employments = []
+                wage_employments = []
+                cpr_employments = []
+            # Hvis inaktiv på løndatoen
+            elif len(active_on_wage) == 0:
+                error_type = "EMPLOYMENT_NOT_ACTIVE_ON_WAGE"
+
+                # Find det CPR der senest var tilknyttet tjenestenummeret
+                latest_cpr = helper_functions.get_items_from_query_with_params(
+                    connection_string=connection_string_faelles,
+                    query=latest_cpr_sql,
+                    params=[tjenestenummer],
+                )[0]
+                emp_cpr = latest_cpr["CPR"]
+                emp_navn = latest_cpr["Navn"]
+
+                # Find ansættelser på det CPR nummer der senest var tilknyttet tjenestenummeret
+                cpr_employments = helper_functions.get_items_from_query_with_params(
+                    connection_string=connection_string_faelles,
+                    query=cpr_employment_sql,
+                    params=[emp_cpr],
+                )
+
+                # List ansættelser på tjenestenummeret på løndatoen
                 wage_employments = employee_df.query(
                     "Tjenestenummer == @tjenestenummer and Startdato <= @wage_date < Slutdato"
                 ).to_dict(orient="records")
 
-                # Aktiv ved indberetning men ikke ved løn: find alle ansættelser på personens CPR
-                cpr_employments = []
-                if len(active_on_record) > 0:
-                    cpr_employments = helper_functions.get_items_from_query_with_params(
-                        connection_string=connection_string_faelles,
-                        query=cpr_employment_sql,
-                        params=[active_on_record.iloc[0]["CPR"]],
-                    )
+                # Ansættelser på indberetningsdatoen (bruges ikke pt. i mails på denne fejltype)
+                record_employments = employee_df.query(
+                    "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
+                ).to_dict(orient="records")
 
+            # Hvis ansættelsen ikke er aktiv på indberetningsdatoen, men på løndatoen
+            elif len(active_on_record) == 0 and len(active_on_wage) > 0:
+                error_type = "EMPLOYMENT_NOT_ACTIVE_ON_RECORD_ACTIVE_ON_WAGE"
+                # Så skal der bare være besked om det, og om hvilke andre ansættelser der er aktive fildatoen
+
+                wage_employments = active_on_wage.to_dict(orient="records")
+                emp_cpr = wage_employments[0]["CPR"]
+                emp_navn = wage_employments[0]["Navn"]
+                record_employments = employee_df.query(
+                    "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
+                ).to_dict(orient="records")
+
+            key = (tjenestenummer, error_type)
+            if key not in seen:
                 mismatches.append(
                     {
                         **record,
-                        "Navn": next(
-                            (e["Navn"] for e in record_employments + wage_employments),
-                            None,
-                        ),
+                        "Navn": emp_navn,
                         "record_employments": record_employments,
                         "wage_employments": wage_employments,
                         "cpr_employments": cpr_employments,
                         "active_on_record": not active_on_record.empty,
                         "active_on_wage": not active_on_wage.empty,
-                        "Error": "NO_ACTIVE_XA_EMPLOYMENT"
-                        if not record_employments + wage_employments
-                        else "XA_EMPLOYMENT_NON_ACTIVE",
+                        "Error": error_type,
                     }
                 )
                 seen.add(key)
