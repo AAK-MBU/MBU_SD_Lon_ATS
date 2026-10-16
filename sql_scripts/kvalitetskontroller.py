@@ -754,11 +754,7 @@ def kv5():
                 ans.[Startdato],
                 ans.[Slutdato],
                 ans.[Statuskode],
-                sta.[StatusTekst],
-                LEAD(ans.[Statuskode]) OVER (
-                    PARTITION BY ans.[Institutionskode], ans.[Tjenestenummer], ans.[CPR]
-                    ORDER BY ans.[Startdato]
-                ) AS NaesteStatuskode
+                sta.[StatusTekst]
             FROM
                 [Personale].[sd_magistrat].[Ansættelse_mbu] ans
             LEFT JOIN
@@ -781,15 +777,8 @@ def kv5():
             Ansaettelseslinjer
         WHERE
             CAST(Slutdato AS date) > DATEADD(year, -1, CAST(GETDATE() AS date))
-            AND (
-                Statuskode IN ('1', '3', '5')
-                OR (
-                    CAST(Slutdato AS date) <> '9999-12-31'
-                    AND NaesteStatuskode IN ('1', '3', '5')
-                )
-            )
         ORDER BY
-            Slutdato DESC
+            Startdato DESC
     """
 
     logger.info(
@@ -861,11 +850,8 @@ def kv5():
                 latest_employment = in_data.sort_values("Startdato").iloc[-1]
                 emp_navn = latest_employment["Navn"]
             # Hvis ansættelsen ikke er aktiv på indberetningsdatoen, men på løndatoen
-            elif (
-                len(active_on_record) == 0 
-                and len(active_on_wage) > 0 
-            ):  
-                # len(active_on_wage) vil som regel være én, hvis der er aktiv ansættelse på løndatoen, 
+            elif len(active_on_record) == 0 and len(active_on_wage) > 0:
+                # len(active_on_wage) vil som regel være én, hvis der er aktiv ansættelse på løndatoen,
                 # men få ansættelser har to rækker, fordi de har skiftet CPR nummer i løbet af deres ansættelse
                 error_type = "EMPLOYMENT_NOT_ACTIVE_ON_RECORD_ACTIVE_ON_WAGE"
                 latest_employment = in_data.sort_values("Startdato").iloc[-1]
