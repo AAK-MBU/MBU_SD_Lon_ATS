@@ -223,7 +223,7 @@ def construct_worker_text(process_type: str, data: dict):
                     + f"<p>Navn: {person_name}</p>"
                     + f"<p>Filnavn: {file_name}</p>"
                     + f"<p>Tjenestenummerets ansættelsessatus på registreringsdatoen ({file_date}):</p>"
-                    + employment_list(data.get("wage_employments", []))
+                    + employment_list(data.get("record_employments", []))
                     + f"<p>Tjenestenummerets ansættelsessatus på løndatoen ({wage_date}):</p>"
                     + employment_list(data.get("wage_employments", []))
                 ),

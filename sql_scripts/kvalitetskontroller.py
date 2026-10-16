@@ -806,6 +806,7 @@ def kv5():
                 ON ans.CPR = per.CPR
         WHERE
             ans.Tjenestenummer = ?
+            and ans.Institutionskode = 'XA'
             and ans.Statuskode != 'S'
         ORDER BY
             ans.[Startdato] DESC
@@ -902,12 +903,12 @@ def kv5():
 
                 # List ansættelser på tjenestenummeret på løndatoen
                 wage_employments = employee_df.query(
-                    "Tjenestenummer == @tjenestenummer and Startdato <= @wage_date < Slutdato"
+                    "Tjenestenummer == @tjenestenummer and Startdato <= @wage_date <= Slutdato"
                 ).to_dict(orient="records")
 
                 # Ansættelser på indberetningsdatoen (bruges ikke pt. i mails på denne fejltype)
                 record_employments = employee_df.query(
-                    "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
+                    "Tjenestenummer == @tjenestenummer and Startdato <= @record_date <= Slutdato"
                 ).to_dict(orient="records")
 
             # Hvis ansættelsen ikke er aktiv på indberetningsdatoen, men på løndatoen
