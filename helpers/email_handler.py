@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+from datetime import datetime
 
 from helpers import smtp_util
 from helpers.helper_functions import dk_month_relative, find_pair_info, get_tillaeg_navn
@@ -34,6 +35,86 @@ def handle_email(data: dict, process_type: str, notification_receiver: str):
     )
 
     logger.info(f"E-mail sent to {receiver}")
+
+
+def employment_list(employments: list) -> str:
+    """Formatér en liste af ansættelser som HTML-lister."""
+    return (
+        "".join(
+            "<ul>"
+            + "".join(
+                f"<li>{label}: {e.get(key)}</li>"
+                for label, key in [
+                    ("Tjenestenummer", "Tjenestenummer"),
+                    ("Institutionskode", "Institutionskode"),
+                    ("Afdeling", "Afdeling"),
+                    ("Startdato", "Startdato"),
+                    ("Slutdato", "Slutdato"),
+                    ("Status for ansættelse", "StatusTekst"),
+                ]
+            )
+            + "</ul>"
+            for e in employments
+        )
+        or "<p>Ingen ansættelser fundet.</p>"
+    )
+
+
+def html_table(rows: list, columns: list) -> str:
+    """Formatér rækker som HTML-tabel.
+
+    Args:
+        rows: Rækker som dicts.
+        columns: Kolonner som (overskrift, nøgle i rækken).
+    """
+    header = "".join(f"<th>{label}</th>" for label, _ in columns)
+    body = "".join(
+        "<tr>" + "".join(f"<td>{r.get(key)}</td>" for _, key in columns) + "</tr>"
+        for r in rows
+    )
+    return (
+        '<table border="1" cellpadding="4" style="border-collapse: collapse">'
+        + f"<tr>{header}</tr>{body}</table>"
+    )
+
+
+def wage_rows_table(rows: list) -> str:
+    """Formatér fejlende lønrækker som HTML-tabel med filnavn, linjenummer, indberetnings- og løndato."""
+    return html_table(
+        rows,
+        [
+            ("Filnavn", "File_name"),
+            ("Linjenummer", "Line_no"),
+            ("Indberetningsdato", "File date"),
+            ("Løndato", "Wage date"),
+        ],
+    )
+
+
+def employment_table(employments: list) -> str:
+    """Formatér en liste af ansættelser som HTML-tabel."""
+    if not employments:
+        return "<p>Ingen ansættelser fundet.</p>"
+    return html_table(
+        employments,
+        [
+            ("Tjenestenummer", "Tjenestenummer"),
+            ("Institutionskode", "Institutionskode"),
+            ("Afdeling", "Afdeling"),
+            ("Startdato", "Startdato"),
+            ("Slutdato", "Slutdato"),
+            ("Status for ansættelse", "StatusTekst"),
+        ],
+    )
+
+
+def employment_status(statuses: list, date_label: str) -> str:
+    """Formatér tjenestenummerets ansættelser for hver dato i statuses."""
+    return "".join(
+        f"<p>Tjenestenummerets ansættelsesstatus på {date_label} ({s.get('Dato')}):</p>"
+        + employment_list(s.get("Ansættelser", []))
+        for s in statuses
+    )
 
 
 def construct_worker_text(process_type: str, data: dict):
@@ -145,40 +226,66 @@ def construct_worker_text(process_type: str, data: dict):
     # Medarbejder tilkoblet forkert TRIO SKOLEKODE
     elif process_type == "KV5":
         error = data.get("Error")
-        Folder_date = data.get("Folder_date")
-        file_name = data.get("File_name")
+        records = data.get("Records", [])
         trio_school_code = data.get("Trio_school_code")
+        allowed_sd = data.get("Allowed_sd", "")
 
-        if error == "NO_ACTIVE_XA_EMPLOYMENT":
-            subject = "Ikke eksisterende medarbejder fundet i lønudtræk"
+        trio_messages = {
+            "NO_EMPLOYMENT": {
+                "subject": "TRIO: Ikke eksisterende medarbejder fundet i lønudtræk",
+                "text": (
+                    "<h4>Følgende tjenestenummer er fundet i et lønudtræk, men eksisterer ikke i MBU's ansættelsesdata</h4>"
+                    + f"<p>Tjenestenummer: {person_id}</p>"
+                    + "<p>Lønrækker med dette tjenestenummer:</p>"
+                    + wage_rows_table(records)
+                ),
+            },
+            "SD_NOT_VALID_FOR_TRIO": {
+                "subject": "TRIO: Medarbejder er tilkoblet forkert TRIO skolekode",
+                "text": (
+                    "<h4>Følgende medarbejder er tilkoblet den forkerte TRIO skolekode, på baggrund af den SD Afdelingskode, de står med i deres ansættelse</h4>"
+                    + f"<p>Tjenestenummer: {person_id}</p>"
+                    + f"<p>Navn: {person_name}</p>"
+                    + f"<p>Overenskomst: {overenskomst}</p>"
+                    + f"<p>SD institutionskode: {sd_inst_kode}</p>"
+                    + f"<p>SD Afdelingskode: {afdeling}</p>"
+                    + f"<p>TRIO skolekode: {trio_school_code}</p>"
+                    + f"<p>Følgende SD afdelingskoder er tilkoblet skolekode {trio_school_code}:</p>"
+                    + f"<p>{allowed_sd}:</p>"
+                ),
+            },
+            "EMPLOYMENT_NOT_ACTIVE_ON_WAGE": {
+                "subject": "TRIO: Løn registreret på ansættelse inaktiv på løndatoen",
+                "text": (
+                    "<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på løndatoen</h4>"
+                    + f"<p>Tjenestenummer: {person_id}</p>"
+                    + f"<p>Navn: {person_name}</p>"
+                    + "<p>Lønrækker med fejl:</p>"
+                    + wage_rows_table(records)
+                    + employment_status(data.get("wage_status", []), "løndatoen")
+                    + "<p>Alle ansættelser på det CPR-nr. der senest var tilknyttet tjenestenummeret:</p>"
+                    + employment_table(data.get("cpr_employments", []))
+                ),
+            },
+            "EMPLOYMENT_NOT_ACTIVE_ON_RECORD_ACTIVE_ON_WAGE": {
+                "subject": "TRIO: Løn registreret på ansættelse inaktiv på indberetningsdatoen",
+                "text": (
+                    "<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på indberetningsdatoen</h4>"
+                    + f"<p>Tjenestenummer: {person_id}</p>"
+                    + f"<p>Navn: {person_name}</p>"
+                    + "<p>Lønrækker med fejl:</p>"
+                    + wage_rows_table(records)
+                    + employment_status(
+                        data.get("record_status", []), "indberetningsdatoen"
+                    )
+                    + employment_status(data.get("wage_status", []), "løndatoen")
+                ),
+            },
+        }
 
-            # Construct message
-            text = (
-                "<h4>Følgende tjenestenummer er fundet i et lønudtræk, men eksisterer ikke i MBU's ansættelsesdata</h4>"
-                + f"<p>Tjenestenummer: {person_id}</p>"
-                + "<p>Tjenestenummeret blev fundet i et lønudtræk for skole med følgende skolekode:</p>"
-                + f"<p>TRIO skolekode: {trio_school_code}</p>"
-                + f"<p>Dato for lønudtrækket: {Folder_date}</p>"
-                + f"<p>Filnavn: {file_name}</p>"
-            )
-
-        else:
-            allowed_sd = data.get("Allowed_sd")
-
-            subject = "Medarbejder er tilkoblet forkert TRIO skolekode"
-
-            # Construct message
-            text = (
-                "<h4>Følgende medarbejder er tilkoblet den forkerte TRIO skolekode, på baggrund af den SD Afdelingskode, de står med i deres ansættelse</h4>"
-                + f"<p>Tjenestenummer: {person_id}</p>"
-                + f"<p>Navn: {person_name}</p>"
-                + f"<p>Overenskomst: {overenskomst}</p>"
-                + f"<p>SD institutionskode: {sd_inst_kode}</p>"
-                + f"<p>SD Afdelingskode: {afdeling}</p>"
-                + f"<p>TRIO skolekode: {trio_school_code}</p>"
-                + f"<p>Følgende SD afdelingskoder er tilkoblet skolekode {trio_school_code}:</p>"
-                + f"<p>{allowed_sd}:</p>"
-            )
+        msg = trio_messages[error]
+        subject = msg["subject"]
+        text = msg["text"]
 
     elif process_type == "KV6":
         prev_beloeb = data.get("sum_tillægsbeløb_forrige", None)
