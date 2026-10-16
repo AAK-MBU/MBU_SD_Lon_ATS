@@ -792,26 +792,6 @@ def kv5():
             Slutdato DESC
     """
 
-    latest_cpr_sql = """
-        SELECT TOP (1)
-            ans.[CPR],
-            per.[Navn]
-        FROM
-            [Personale].[sd_magistrat].[Ansættelse_mbu] ans
-        LEFT JOIN
-            [Personale].[sd].[Statuskode] sta
-                ON ans.Statuskode = sta.Statuskode
-        LEFT JOIN
-            [Personale].[sd].[personStam] per
-                ON ans.CPR = per.CPR
-        WHERE
-            ans.Tjenestenummer = ?
-            and ans.Institutionskode = 'XA'
-            and ans.Statuskode != 'S'
-        ORDER BY
-            ans.[Startdato] DESC
-    """
-
     logger.info(
         f"XA employments fetched for relevant period ({min_date_placeholder} - {max_date_placeholder})"
     )
@@ -819,8 +799,7 @@ def kv5():
     # # --------------------------------------------------
     # Phase 3: Fetch TRIO → SD mappings (ONE SQL)
     # --------------------------------------------------
-    mismatches = []
-    seen = set()
+    mismatches_by_key = {}
     logger.info("Fetching TRIO -> SD mappings")
     trio_placeholders = ",".join("?" for _ in trio_school_codes)
 
@@ -870,74 +849,73 @@ def kv5():
             "Tjenestenummer == @tjenestenummer and Startdato <= @wage_date <= Slutdato"
         )
 
-        emp_cpr = "Ukendt"
         emp_navn = "Ukendt"
-
         # Ved inaktiv på én af datoerne
         if len(active_on_record) == 0 or len(active_on_wage) == 0:
             # Hvis slet ikke i løndata
             if len(in_data) == 0:
                 error_type = "NO_EMPLOYMENT"
-                record_employments = []
-                wage_employments = []
-                cpr_employments = []
             # Hvis inaktiv på løndatoen
             elif len(active_on_wage) == 0:
                 error_type = "EMPLOYMENT_NOT_ACTIVE_ON_WAGE"
-
-                # Find det CPR der senest var tilknyttet tjenestenummeret
-                latest_cpr = helper_functions.get_items_from_query_with_params(
-                    connection_string=connection_string_faelles,
-                    query=latest_cpr_sql,
-                    params=[tjenestenummer],
-                )[0]
-                emp_cpr = latest_cpr["CPR"]
-                emp_navn = latest_cpr["Navn"]
-
-                # Find ansættelser på det CPR nummer der senest var tilknyttet tjenestenummeret
-                cpr_employments = helper_functions.get_items_from_query_with_params(
-                    connection_string=connection_string_faelles,
-                    query=cpr_employment_sql,
-                    params=[emp_cpr],
-                )
-
-                # List ansættelser på tjenestenummeret på løndatoen
-                wage_employments = employee_df.query(
-                    "Tjenestenummer == @tjenestenummer and Startdato <= @wage_date <= Slutdato"
-                ).to_dict(orient="records")
-
-                # Ansættelser på indberetningsdatoen (bruges ikke pt. i mails på denne fejltype)
-                record_employments = employee_df.query(
-                    "Tjenestenummer == @tjenestenummer and Startdato <= @record_date <= Slutdato"
-                ).to_dict(orient="records")
-
+                latest_employment = in_data.sort_values("Startdato").iloc[-1]
+                emp_navn = latest_employment["Navn"]
             # Hvis ansættelsen ikke er aktiv på indberetningsdatoen, men på løndatoen
-            elif len(active_on_record) == 0 and len(active_on_wage) > 0:
+            elif (
+                len(active_on_record) == 0 
+                and len(active_on_wage) > 0 
+            ):  
+                # len(active_on_wage) vil som regel være én, hvis der er aktiv ansættelse på løndatoen, 
+                # men få ansættelser har to rækker, fordi de har skiftet CPR nummer i løbet af deres ansættelse
                 error_type = "EMPLOYMENT_NOT_ACTIVE_ON_RECORD_ACTIVE_ON_WAGE"
-                # Så skal der bare være besked om det, og om hvilke andre ansættelser der er aktive fildatoen
+                latest_employment = in_data.sort_values("Startdato").iloc[-1]
+                emp_navn = latest_employment["Navn"]
 
-                wage_employments = active_on_wage.to_dict(orient="records")
-                emp_cpr = wage_employments[0]["CPR"]
-                emp_navn = wage_employments[0]["Navn"]
-                record_employments = employee_df.query(
-                    "Tjenestenummer == @tjenestenummer and Startdato <= @record_date < Slutdato"
-                ).to_dict(orient="records")
-
+            # Én mismatch per tjenestenummer og fejltype. Fælles oplysninger
+            # (navn og ansættelser på CPR-nr.) slås kun op første gang.
             key = (tjenestenummer, error_type)
-            if key not in seen:
-                mismatches.append(
-                    {
-                        **record,
-                        "Navn": emp_navn,
-                        "record_employments": record_employments,
-                        "wage_employments": wage_employments,
-                        "cpr_employments": cpr_employments,
-                        "active_on_record": not active_on_record.empty,
-                        "active_on_wage": not active_on_wage.empty,
-                        "Error": error_type,
-                    }
-                )
-                seen.add(key)
+            if key not in mismatches_by_key:
+                mismatch = {
+                    "Records": [],
+                    "Tjenestenummer": tjenestenummer,
+                    "Navn": emp_navn,
+                    "Error": error_type,
+                    "record_status": [],
+                    "wage_status": [],
+                    "cpr_employments": [],
+                }
+
+                if error_type == "EMPLOYMENT_NOT_ACTIVE_ON_WAGE":
+                    # Ansættelser på det CPR-nr. der senest var tilknyttet tjenestenummeret
+                    mismatch["cpr_employments"] = (
+                        helper_functions.get_items_from_query_with_params(
+                            connection_string=connection_string_faelles,
+                            query=cpr_employment_sql,
+                            params=[latest_employment["CPR"]],
+                        )
+                    )
+
+                mismatches_by_key[key] = mismatch
+
+            mismatch = mismatches_by_key[key]
+
+            # Hver fejlende lønrække bliver en række i mailens tabel
+            mismatch["Records"].append({**record})
+
+            # # Tjenestenummerets ansættelser på hver forskellig indberetnings- og løndato
+            for status_key, status_date in (
+                ("record_status", record_date),
+                ("wage_status", wage_date),
+            ):
+                if all(s["Dato"] != status_date for s in mismatch[status_key]):
+                    mismatch[status_key].append(
+                        {
+                            "Dato": status_date,
+                            "Ansættelser": employee_df.query(
+                                "Tjenestenummer == @tjenestenummer and Startdato <= @status_date <= Slutdato"
+                            ).to_dict(orient="records"),
+                        }
+                    )
 
             continue
 
@@ -948,18 +926,17 @@ def kv5():
         if afdeling not in allowed_sd:
             key = (tjenestenummer, trio_school_code, "SD_NOT_VALID_FOR_TRIO")
 
-            if key not in seen:
-                mismatches.append(
-                    {
-                        **record,
-                        "Afdeling": afdeling,
-                        "Allowed_sd": sorted(allowed_sd),
-                        "Navn": employee.get("Navn"),
-                        "Overenskomst": employee.get("Overenskomst"),
-                        "Error": "SD_NOT_VALID_FOR_TRIO",
-                    }
-                )
-                seen.add(key)
+            if key not in mismatches_by_key:
+                mismatches_by_key[key] = {
+                    **record,
+                    "Afdeling": afdeling,
+                    "Allowed_sd": sorted(allowed_sd),
+                    "Navn": employee.get("Navn"),
+                    "Overenskomst": employee.get("Overenskomst"),
+                    "Error": "SD_NOT_VALID_FOR_TRIO",
+                }
+
+    mismatches = list(mismatches_by_key.values())
 
     logger.info("Payroll placement validation completed")
     logger.info("KV5 logic completed")

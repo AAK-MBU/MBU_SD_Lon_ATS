@@ -60,6 +60,34 @@ def employment_list(employments: list) -> str:
     )
 
 
+def wage_rows_table(rows: list) -> str:
+    """Formatér fejlende lønrækker som HTML-tabel med filnavn, linjenummer, indberetnings- og løndato."""
+    columns = [
+        ("Filnavn", "File_name"),
+        ("Linjenummer", "Line_no"),
+        ("Indberetningsdato", "File date"),
+        ("Løndato", "Wage date"),
+    ]
+    header = "".join(f"<th>{label}</th>" for label, _ in columns)
+    body = "".join(
+        "<tr>" + "".join(f"<td>{r.get(key)}</td>" for _, key in columns) + "</tr>"
+        for r in rows
+    )
+    return (
+        '<table border="1" cellpadding="4" style="border-collapse: collapse">'
+        + f"<tr>{header}</tr>{body}</table>"
+    )
+
+
+def employment_status(statuses: list, date_label: str) -> str:
+    """Formatér tjenestenummerets ansættelser for hver dato i statuses."""
+    return "".join(
+        f"<p>Tjenestenummerets ansættelsesstatus på {date_label} ({s.get('Dato')}):</p>"
+        + employment_list(s.get("Ansættelser", []))
+        for s in statuses
+    )
+
+
 def construct_worker_text(process_type: str, data: dict):
     """Function to construct text for the different processes"""
 
@@ -169,10 +197,7 @@ def construct_worker_text(process_type: str, data: dict):
     # Medarbejder tilkoblet forkert TRIO SKOLEKODE
     elif process_type == "KV5":
         error = data.get("Error")
-        Folder_date = data.get("Folder_date")
-        file_date = data.get("File date", "")
-        wage_date = data.get("Wage date", "")
-        file_name = data.get("File_name")
+        records = data.get("Records", [])
         trio_school_code = data.get("Trio_school_code")
         allowed_sd = data.get("Allowed_sd", "")
 
@@ -182,10 +207,8 @@ def construct_worker_text(process_type: str, data: dict):
                 "text": (
                     "<h4>Følgende tjenestenummer er fundet i et lønudtræk, men eksisterer ikke i MBU's ansættelsesdata</h4>"
                     + f"<p>Tjenestenummer: {person_id}</p>"
-                    + "<p>Tjenestenummeret blev fundet i et lønudtræk for skole med følgende skolekode:</p>"
-                    + f"<p>TRIO skolekode: {trio_school_code}</p>"
-                    + f"<p>Dato for lønudtrækket: {Folder_date}</p>"
-                    + f"<p>Filnavn: {file_name}</p>"
+                    + "<p>Lønrækker med dette tjenestenummer:</p>"
+                    + wage_rows_table(records)
                 ),
             },
             "SD_NOT_VALID_FOR_TRIO": {
@@ -208,11 +231,11 @@ def construct_worker_text(process_type: str, data: dict):
                     "<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på løndatoen</h4>"
                     + f"<p>Tjenestenummer: {person_id}</p>"
                     + f"<p>Navn: {person_name}</p>"
-                    + f"<p>Filnavn: {file_name}</p>"
-                    + f"<p>Tjenestenummerets ansættelsessatus på løndatoen ({wage_date}):</p>"
-                    + employment_list(data.get("wage_employments", []))
+                    + "<p>Lønrækker med fejl:</p>"
+                    + wage_rows_table(records)
+                    + employment_status(data.get("wage_status", []), "løndatoen")
                     + "<p>Alle ansættelser på det CPR-nr. der senest var tilknyttet tjenestenummeret:</p>"
-                    + employment_list(data["cpr_employments"])
+                    + employment_list(data.get("cpr_employments", []))
                 ),
             },
             "EMPLOYMENT_NOT_ACTIVE_ON_RECORD_ACTIVE_ON_WAGE": {
@@ -221,11 +244,12 @@ def construct_worker_text(process_type: str, data: dict):
                     "<h4>Der er på følgende tjenestenummer indberettet løn, hvor ansættelsen ikke var aktiv på indberetningsdatoen</h4>"
                     + f"<p>Tjenestenummer: {person_id}</p>"
                     + f"<p>Navn: {person_name}</p>"
-                    + f"<p>Filnavn: {file_name}</p>"
-                    + f"<p>Tjenestenummerets ansættelsessatus på registreringsdatoen ({file_date}):</p>"
-                    + employment_list(data.get("record_employments", []))
-                    + f"<p>Tjenestenummerets ansættelsessatus på løndatoen ({wage_date}):</p>"
-                    + employment_list(data.get("wage_employments", []))
+                    + "<p>Lønrækker med fejl:</p>"
+                    + wage_rows_table(records)
+                    + employment_status(
+                        data.get("record_status", []), "indberetningsdatoen"
+                    )
+                    + employment_status(data.get("wage_status", []), "løndatoen")
                 ),
             },
         }

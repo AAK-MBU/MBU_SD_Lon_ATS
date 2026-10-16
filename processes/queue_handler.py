@@ -53,14 +53,10 @@ def retrieve_items_for_queue() -> list[dict]:
 
     if retrieved_items:
         for i, item in enumerate(retrieved_items):
-            if "--kv5" in sys.argv:
-                reference = f"{process}_{datetime.now().strftime('%d%m%y')}_{item.get('Tjenestenummer')}"
-                references.append(reference)
-
-            else:
-                references.append(
-                    f"{process}_{datetime.now().strftime('%d%m%y')}_{i + 1}"
-                )
+            
+            references.append(
+                f"{process}_{datetime.now().strftime('%d%m%y')}_{i + 1}"
+            )
 
             formatted_item = helper_functions.format_item(item)
             data.append(formatted_item)
