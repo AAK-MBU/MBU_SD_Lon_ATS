@@ -60,14 +60,13 @@ def employment_list(employments: list) -> str:
     )
 
 
-def wage_rows_table(rows: list) -> str:
-    """Formatér fejlende lønrækker som HTML-tabel med filnavn, linjenummer, indberetnings- og løndato."""
-    columns = [
-        ("Filnavn", "File_name"),
-        ("Linjenummer", "Line_no"),
-        ("Indberetningsdato", "File date"),
-        ("Løndato", "Wage date"),
-    ]
+def html_table(rows: list, columns: list) -> str:
+    """Formatér rækker som HTML-tabel.
+
+    Args:
+        rows: Rækker som dicts.
+        columns: Kolonner som (overskrift, nøgle i rækken).
+    """
     header = "".join(f"<th>{label}</th>" for label, _ in columns)
     body = "".join(
         "<tr>" + "".join(f"<td>{r.get(key)}</td>" for _, key in columns) + "</tr>"
@@ -76,6 +75,36 @@ def wage_rows_table(rows: list) -> str:
     return (
         '<table border="1" cellpadding="4" style="border-collapse: collapse">'
         + f"<tr>{header}</tr>{body}</table>"
+    )
+
+
+def wage_rows_table(rows: list) -> str:
+    """Formatér fejlende lønrækker som HTML-tabel med filnavn, linjenummer, indberetnings- og løndato."""
+    return html_table(
+        rows,
+        [
+            ("Filnavn", "File_name"),
+            ("Linjenummer", "Line_no"),
+            ("Indberetningsdato", "File date"),
+            ("Løndato", "Wage date"),
+        ],
+    )
+
+
+def employment_table(employments: list) -> str:
+    """Formatér en liste af ansættelser som HTML-tabel."""
+    if not employments:
+        return "<p>Ingen ansættelser fundet.</p>"
+    return html_table(
+        employments,
+        [
+            ("Tjenestenummer", "Tjenestenummer"),
+            ("Institutionskode", "Institutionskode"),
+            ("Afdeling", "Afdeling"),
+            ("Startdato", "Startdato"),
+            ("Slutdato", "Slutdato"),
+            ("Status for ansættelse", "StatusTekst"),
+        ],
     )
 
 
@@ -235,7 +264,7 @@ def construct_worker_text(process_type: str, data: dict):
                     + wage_rows_table(records)
                     + employment_status(data.get("wage_status", []), "løndatoen")
                     + "<p>Alle ansættelser på det CPR-nr. der senest var tilknyttet tjenestenummeret:</p>"
-                    + employment_list(data.get("cpr_employments", []))
+                    + employment_table(data.get("cpr_employments", []))
                 ),
             },
             "EMPLOYMENT_NOT_ACTIVE_ON_RECORD_ACTIVE_ON_WAGE": {
