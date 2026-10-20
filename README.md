@@ -28,20 +28,25 @@ Robotten foretager følgende kvalitetskontroller af igangværende ansættelser
 ## Notifikationstype
 Robotten notificerer relevante modtagere om de fundne fejl. Her vælges mellem følgende muligheder
 
-1. **Mail** <br>
+1. **Mail** (`notification_type`: `Send mail`) <br>
     Robotten sender en mail med oplysninger om fejlen. Mailen kan sendes til en fastsat person eller til en AF fællespostkasse.
 
 eller
 
-2. **ServiceNow sag** <br>
-    Under udarbejdelse
+2. **ServiceNow sag** (`notification_type`: `Opret ServiceNow-sag`) <br>
+    Under udarbejdelse. Robotten opretter en sag i ServiceNow gennem API'et. Skelettet ligger i [notifikationer/servicenow](notifikationer/servicenow/).
 
 ## Flow og kodestruktur
 Robotten bliver startet gennem en trigger i OpenOrchestrator, hvor trigger properties angiver [kvalitetskontrol](#kvalitetskontroller), [notifikationstype](#notifikationsmuligheder) og modtager. Herefter identificerer robotten fejl indenfor fejltypen og konstruerer og sender notifikationer for hver fundet fejl. Hver trigger er defineret med et tidsinterval, som den bliver genaktiveret ved, <br>
-Al koden til robotten ligger i [robot_framework](./robot_framework/). <br>
-Koden bliver kørt i [queue_framework](robot_framework/queue_framework.py) og følger følgende process:
-- Processen initialiseres i [initialize.py](/robot_framework/initialize.py) for den angivne [kvalitetskontrol](#kvalitetskontroller) <br>
-    Den valgte kontrol køres i [kvalitetskontroller.py](/robot_framework/sql_scripts/kvalitetskontroller.py) og danner kø-elementer baseret på de fundne fejl.
-- Hvert kø-element processeres i [process.py](/robot_framework/process.py), hvor notifikationen bliver afsendt. <br>
+Koden bliver kørt fra [main.py](main.py) og følger følgende proces:
+- Den valgte kontrol slås op i `PROCESS_PROCEDURE_DICT` i [helpers/config.py](helpers/config.py) og køres fra [fejlfinding/](fejlfinding/). Kontrollen danner kø-elementer baseret på de fundne fejl.
+- Hvert kø-element processeres i [processes/process_item.py](processes/process_item.py), hvor notifikationen bliver sendt med den metode, `notification_type` peger på i [notifikationer/](notifikationer/__init__.py).
 
-De forskellige processer er struktureret under [kvailitetskontroller.py](/robot_framework/sql_scripts/kvalitetskontroller.py), hvor ét eller flere steps gennemgås for at samle de relevante items for processen.
+### Mappestruktur
+- `fejlfinding/` – én fil pr. kvalitetskontrol (`kv1.py` … `kv7.py`, `kv3_dev.py`), der finder fejl og returnerer dem som kø-elementer.
+- `notifikationer/mail/` – én fil pr. kvalitetskontrol med mailens emne og tekst (`construct_email`), samt afsendelse (`sender.py`, `smtp_util.py`).
+- `notifikationer/servicenow/` – oprettelse af ServiceNow-sager (under udarbejdelse).
+- `helpers/ats_helpers.py` – hjælpefunktioner til Automation Server og kø-elementer.
+- `helpers/proces_helpers.py` – alle hjælpefunktioner til kontrollerne og notifikationerne (databaseopslag, enheder, tillæg, løn, HTML).
+- `helpers/config.py`, `helpers/process_constants.py`, `helpers/tillaeg_pairs.py` – konfiguration, konstanter og tillægspar.
+- `processes/` – robotrammen: kø, fejlhåndtering, applikation og afslutning.

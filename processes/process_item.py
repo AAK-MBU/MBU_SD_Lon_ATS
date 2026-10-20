@@ -3,8 +3,8 @@
 
 import logging
 
-from helpers.config import WORKER_MAP
 from helpers.process_constants import PROCESS_CONSTANTS
+from notifikationer import NOTIFICATION_HANDLERS
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ def process_item(item_data: dict, item_reference: str):
         notification_receiver = item_data.get("AF_email")
 
     # Find and apply worker
-    worker = WORKER_MAP.get(notification_type, None)
+    worker = NOTIFICATION_HANDLERS.get(notification_type, None)
     if not worker:
         raise ValueError(f"No worker defined for process {notification_type}")
 

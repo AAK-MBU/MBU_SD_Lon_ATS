@@ -10,7 +10,7 @@ from automation_server_client import AutomationServer, Workqueue
 from mbu_rpa_core.exceptions import BusinessError, ProcessError
 from mbu_rpa_core.process_states import CompletedState
 
-from helpers import ats_functions, config
+from helpers import ats_helpers, config
 from processes.application_handler import close, reset, startup
 from processes.error_handling import ErrorContext, handle_error
 from processes.finalize_process import finalize_process
@@ -72,7 +72,7 @@ async def populate_queue(workqueue: Workqueue):
 
     items_to_queue = retrieve_items_for_queue()
 
-    queue_references = {str(r) for r in ats_functions.get_workqueue_items(workqueue)}
+    queue_references = {str(r) for r in ats_helpers.get_workqueue_items(workqueue)}
 
     new_items: list[dict] = []
     for item in items_to_queue:
@@ -103,7 +103,7 @@ async def process_workqueue(workqueue: Workqueue):
         for item in workqueue:
             try:
                 with item:
-                    data, reference = ats_functions.get_item_info(item)
+                    data, reference = ats_helpers.get_item_info(item)
 
                     try:
                         logger.info("Processing item with reference: %s", reference)
@@ -178,7 +178,7 @@ async def finalize(workqueue: Workqueue):
 
 
 if __name__ == "__main__":
-    ats_functions.init_logger()
+    ats_helpers.init_logger()
 
     ats = AutomationServer.from_environment()
 

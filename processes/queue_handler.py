@@ -8,7 +8,7 @@ from datetime import datetime
 
 from automation_server_client import Workqueue
 
-from helpers import config, helper_functions
+from helpers import ats_helpers, config
 from helpers.process_constants import PROCESS_CONSTANTS
 from processes.error_handling import ErrorContext, handle_error
 
@@ -58,7 +58,7 @@ def retrieve_items_for_queue() -> list[dict]:
                 f"{process}_{datetime.now().strftime('%d%m%y')}_{i + 1}"
             )
 
-            formatted_item = helper_functions.format_item(item)
+            formatted_item = ats_helpers.format_item(item)
             data.append(formatted_item)
 
         logger.info(f"Populating queue with {len(retrieved_items)} items.")

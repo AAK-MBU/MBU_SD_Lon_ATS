@@ -1,8 +1,11 @@
-"""Helper module to call some functionality in Automation Server using the API"""
+"""Hjælpefunktioner til Automation Server: kø-elementer, API-kald og logging"""
 
 import logging
 import os
+from datetime import date
+from decimal import Decimal
 
+import pandas as pd
 import requests
 from automation_server_client import WorkItem, Workqueue
 from dotenv import load_dotenv
@@ -63,3 +66,28 @@ def init_logger():
         format="%(asctime)s [%(levelname)s] %(module)s.%(funcName)s:%(lineno)d — %(message)s",
         datefmt="%H:%M:%S",
     )
+
+
+def value_formatter(value):
+    """Formatér en værdi rekursivt, så den kan serialiseres til JSON."""
+    if isinstance(value, dict):
+        return {key: value_formatter(v) for key, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [value_formatter(v) for v in value]
+    if isinstance(value, date):
+        return value.strftime("%d-%m-%Y")
+    if isinstance(value, Decimal):
+        return int(value)
+    return value
+
+
+def format_item(item: dict):
+    """Format dates in dict, e.g. for json parsing"""
+
+    return {key: value_formatter(value) for key, value in item.items()}
+
+
+def item_df_to_item_list(item_df: pd.DataFrame) -> list:
+    items = list(item_df.T.to_dict().values())
+
+    return items

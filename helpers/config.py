@@ -1,8 +1,7 @@
 """Module for general configurations of the process"""
 
-from helpers import email_handler
+from fejlfinding import kv1, kv2, kv3, kv3_dev, kv4, kv5, kv6, kv7
 from helpers.tillaeg_pairs import tillaeg_pairs
-from sql_scripts import kvalitetskontroller
 
 MAX_RETRY = 10
 
@@ -31,17 +30,17 @@ TEMP_PATH = R"C:\SDLøn"
 # Dictionary with process specific functions and parameters
 PROCESS_PROCEDURE_DICT = {
     "KV1": {
-        "procedure": kvalitetskontroller.kv1,
+        "procedure": kv1.kv1,
         "parameters": {
             "overenskomst": 47302
         },  # Overenskomst in which all employments should have INSTKODE = XC
     },
     "KV2": {
-        "procedure": kvalitetskontroller.kv2,
+        "procedure": kv2.kv2,
         "parameters": {"tillaegsnr_par": tillaeg_pairs},
     },
     "KV3": {
-        "procedure": kvalitetskontroller.kv3,
+        "procedure": kv3.kv3,
         "parameters": {
             "accept_ovk_dag": (),  # Overenskomster starting with "7" but accepted in dagtilbud/UIAA
             "accept_ovk_skole": (
@@ -61,7 +60,7 @@ PROCESS_PROCEDURE_DICT = {
         },
     },
     "KV3-DEV": {
-        "procedure": kvalitetskontroller.kv3_dev,
+        "procedure": kv3_dev.kv3_dev,
         "parameters": {
             "accept_ovk_dag": (),
             "accept_ovk_skole": (
@@ -81,29 +80,24 @@ PROCESS_PROCEDURE_DICT = {
         },
     },
     "KV4": {
-        "procedure": kvalitetskontroller.kv4,
+        "procedure": kv4.kv4,
         "parameters": {
             "leder_overenskomst": (45082, 45081, 46901, 45101, 47201),
         },
     },
     "KV5": {
-        "procedure": kvalitetskontroller.kv5,
+        "procedure": kv5.kv5,
         "parameters": {},
     },
     "KV6": {
-        "procedure": kvalitetskontroller.kv6,
+        "procedure": kv6.kv6,
         "parameters": {},
     },
     "KV7": {
-        "procedure": kvalitetskontroller.kv7,
+        "procedure": kv7.kv7,
         "parameters": {
             "exclude_schoolname": ["Stensagerskolen", "Langagerskolen"],
             "exclude_dagtilbudname": [],
         },
     },
-}
-
-
-WORKER_MAP = {
-    "Send mail": email_handler.handle_email,
 }
